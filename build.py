@@ -13,6 +13,7 @@ Usage:
   py build.py level-queue --bump minor     bump version for one package
   py build.py --since v1.2.0              only build packages changed since tag
   py build.py --publish <url> <token>      build + push to marketplace
+  py build.py --publish <url> <token> --download-base <cdn-url>  publish with external download URLs
 """
 
 import argparse
@@ -301,9 +302,12 @@ def make_catalog_entry(manifest: dict, checksum: str, download_base: str, pkg_ty
 
 def publish_entry(entry: dict, pkg_file: Path, marketplace_url: str, token: str):
     import urllib.request, urllib.error
+    from urllib.parse import quote
 
+    # Send token both in header and as query param (nginx may strip Authorization header)
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
     base    = marketplace_url.rstrip("/")
+    tq      = f"?_token={quote(token, safe='')}"
 
     create_body = json.dumps({
         "id":              entry["id"],
@@ -319,7 +323,7 @@ def publish_entry(entry: dict, pkg_file: Path, marketplace_url: str, token: str)
     }).encode()
 
     try:
-        req = urllib.request.Request(f"{base}/admin/module", data=create_body, headers=headers, method="POST")
+        req = urllib.request.Request(f"{base}/admin/module{tq}", data=create_body, headers=headers, method="POST")
         urllib.request.urlopen(req, timeout=15)
         ok(f"Created {entry['id']}")
     except urllib.error.HTTPError as e:
@@ -338,7 +342,7 @@ def publish_entry(entry: dict, pkg_file: Path, marketplace_url: str, token: str)
     }).encode()
     try:
         req = urllib.request.Request(
-            f"{base}/admin/module/{entry['id']}/release",
+            f"{base}/admin/module/{entry['id']}/release{tq}",
             data=release_body, headers=headers, method="POST",
         )
         urllib.request.urlopen(req, timeout=15)
@@ -369,9 +373,13 @@ def main():
     parser.add_argument("--bump",    choices=["patch", "minor", "major"])
     parser.add_argument("--since",   metavar="TAG")
     parser.add_argument("--publish", nargs=2, metavar=("URL", "TOKEN"))
+    parser.add_argument("--download-base", metavar="URL",
+                        help="Base URL for file downloads (e.g. GitHub releases). "
+                             "Separate from --publish which is the marketplace API URL.")
     args = parser.parse_args()
 
     marketplace_url, token = args.publish if args.publish else (None, None)
+    download_base = args.download_base or ""
     changed_since = git_changed_since(args.since) if args.since else None
 
     packages = discover_packages()
@@ -433,7 +441,7 @@ def main():
         rel = out_file.relative_to(ROOT)
         ok(f"-> {rel}  ({size_kb} KB)  sha256:{checksum[:12]}…")
 
-        entry = make_catalog_entry(manifest, checksum, marketplace_url or "", kind)
+        entry = make_catalog_entry(manifest, checksum, download_base, kind)
         catalog.append(entry)
         built_files.append((entry, out_file))
 
