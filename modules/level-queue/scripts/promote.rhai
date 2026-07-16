@@ -1,19 +1,18 @@
-// !promote <level_id> — move a level to the front (mod/broadcaster only)
+// !promote <level_id> — move a level to the front (staff only)
 let level_id_str = if args.len() > 0 { args[0] } else { "" };
 let level_id = parse_int(level_id_str);
 
 if level_id == () {
-    chat.reply(`Usage: !promote <level_id>`);
+    chat.reply("Usage: !promote <level_id>");
     return;
 }
 
-// Find the entry
-let found   = ();
+let found          = ();
 let found_col_name = ();
 for col_name in ["viewer", "subscriber"] {
     for e in ms.collection(col_name).all() {
         if e.level_id == level_id {
-            found = e;
+            found          = e;
             found_col_name = col_name;
             break;
         }
@@ -30,11 +29,8 @@ if found.position == 1 {
     return;
 }
 
-let col = ms.collection(found_col_name);
-col.remove(found._id);
-
-// Re-insert all entries: target first, then the rest with renumbered positions
-let remaining = col.all();
+let col       = ms.collection(found_col_name);
+let remaining = col.all().filter(|e| e._id != found._id);
 col.clear();
 
 found.position = 1;

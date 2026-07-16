@@ -1,21 +1,18 @@
-// !remove <level_id> — remove a level (mod removes any; viewer removes their own)
+// !remove <level_id> — remove a level (staff removes any; viewer removes their own)
 let level_id_str = if args.len() > 0 { args[0] } else { "" };
 let level_id = parse_int(level_id_str);
 
 if level_id == () {
-    chat.reply(`Usage: !remove <level_id>`);
+    chat.reply("Usage: !remove <level_id>");
     return;
 }
 
-let is_staff = user.isMod() || user.isBroadcaster();
-
-// Find the entry across both queues
-let found   = ();
+let found          = ();
 let found_col_name = ();
 for col_name in ["viewer", "subscriber"] {
     for e in ms.collection(col_name).all() {
         if e.level_id == level_id {
-            found = e;
+            found          = e;
             found_col_name = col_name;
             break;
         }
@@ -28,7 +25,7 @@ if found == () {
     return;
 }
 
-if !is_staff && found.username != username {
+if !user.isStaff() && found.username != user.name {
     chat.reply("You can only remove your own levels.");
     return;
 }
@@ -36,7 +33,6 @@ if !is_staff && found.username != username {
 let col = ms.collection(found_col_name);
 col.remove(found._id);
 
-// Renumber remaining positions
 let remaining = col.all();
 let pos = 1;
 for e in remaining {
