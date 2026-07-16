@@ -2,18 +2,17 @@
 """
 GDLQBot Build Tool
 ------------------
-Packages modules (.gdmod), libraries (.gdlib), and multi-library bundles (.gdpck).
+Packages modules (.gdmod), and bundles (.gdpck).
+Libraries live inside their bundle's libraries/ subfolder — there is no top-level libraries/ dir.
 
 Usage:
-  py build.py                                   build everything
-  py build.py level-queue                       build one package by id
-  py build.py stdlib                            build a .gdpck bundle
-  py build.py --validate                        validate only, no output files
-  py build.py --bump patch                      bump version + build all
-  py build.py level-queue --bump minor          bump version for one package
-  py build.py --since v1.2.0                    only build changed since tag
-  py build.py --publish <url> <token>           build + push to marketplace
-  py build.py level-queue --publish <url> <tok> single package + publish
+  py build.py                              build everything
+  py build.py level-queue                  build one package by id
+  py build.py --validate                   validate only, no output files
+  py build.py --bump patch                 bump version + build all
+  py build.py level-queue --bump minor     bump version for one package
+  py build.py --since v1.2.0              only build packages changed since tag
+  py build.py --publish <url> <token>      build + push to marketplace
 """
 
 import argparse
@@ -31,8 +30,7 @@ from typing import Optional
 ROOT     = Path(__file__).parent
 DIST     = ROOT / "dist"
 MODULES  = ROOT / "modules"
-LIBS     = ROOT / "libraries"
-PACKAGES = ROOT / "packages"          # multi-library .gdpck bundles
+PACKAGES = ROOT / "packages"
 
 GREEN  = "\033[92m"
 YELLOW = "\033[93m"
@@ -58,7 +56,6 @@ def git_short_sha() -> str:
         return "unknown"
 
 def git_changed_since(tag: str) -> set[str]:
-    """Return set of package IDs whose directory changed since the given tag."""
     try:
         out = subprocess.check_output(
             ["git", "diff", "--name-only", tag, "HEAD"], cwd=ROOT, stderr=subprocess.DEVNULL
@@ -68,15 +65,14 @@ def git_changed_since(tag: str) -> set[str]:
     changed = set()
     for line in out.splitlines():
         parts = line.split("/")
-        if len(parts) >= 2 and parts[0] in ("modules", "libraries", "packages"):
+        if len(parts) >= 2 and parts[0] in ("modules", "packages"):
             changed.add(parts[1])
     return changed
 
 
 # ── Validation ────────────────────────────────────────────────────────────────
 
-MODULE_REQUIRED  = ["id", "name", "version", "min_app_version", "author", "description", "scripts"]
-LIBRARY_REQUIRED = ["id", "name", "version", "min_app_version", "author", "description", "entry", "package_type"]
+MODULE_REQUIRED  = ["id", "name", "version", "min_app_version", "description", "scripts"]
 PACKAGE_REQUIRED = ["id", "name", "version", "author", "description", "package_type"]
 
 def validate_semver(v: str, field: str) -> list[str]:
@@ -85,84 +81,53 @@ def validate_semver(v: str, field: str) -> list[str]:
         return [f'{field} "{v}" is not valid semver (expected x.y.z)']
     return []
 
-def validate_module(pkg_dir: Path) -> tuple[dict, list[str]]:
-    manifest_path = pkg_dir / "manifest.json"
-    if not manifest_path.exists():
-        return {}, [f"manifest.json not found in {pkg_dir.name}"]
+def _read_manifest(path: Path) -> tuple[dict, list[str]]:
+    if not path.exists():
+        return {}, [f"manifest.json not found at {path}"]
     try:
-        m = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8")), []
     except json.JSONDecodeError as e:
         return {}, [f"manifest.json is invalid JSON: {e}"]
 
-    errors = []
+def validate_module(pkg_dir: Path) -> tuple[dict, list[str]]:
+    m, errors = _read_manifest(pkg_dir / "manifest.json")
+    if errors: return m, errors
     missing = [k for k in MODULE_REQUIRED if k not in m]
-    if missing:
-        errors.append(f"Missing required fields: {', '.join(missing)}")
+    if missing: errors.append(f"Missing required fields: {', '.join(missing)}")
     for field in ("version", "min_app_version"):
-        if field in m:
-            errors.extend(validate_semver(m[field], field))
+        if field in m: errors.extend(validate_semver(m[field], field))
     if "scripts" in m:
         for key, rel_path in m["scripts"].items():
             if not (pkg_dir / rel_path).exists():
                 errors.append(f'Script "{key}" -> "{rel_path}" not found')
     return m, errors
 
-def validate_library(pkg_dir: Path) -> tuple[dict, list[str]]:
-    manifest_path = pkg_dir / "manifest.json"
-    if not manifest_path.exists():
-        return {}, [f"manifest.json not found in {pkg_dir.name}"]
-    try:
-        m = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        return {}, [f"manifest.json is invalid JSON: {e}"]
-
-    errors = []
-    missing = [k for k in LIBRARY_REQUIRED if k not in m]
-    if missing:
-        errors.append(f"Missing required fields: {', '.join(missing)}")
-    for field in ("version", "min_app_version"):
-        if field in m:
-            errors.extend(validate_semver(m[field], field))
-    if "package_type" in m and m["package_type"] != "library":
-        errors.append(f'package_type must be "library", got "{m["package_type"]}"')
-    if "entry" in m and not (pkg_dir / m["entry"]).exists():
-        errors.append(f'entry file "{m["entry"]}" not found')
-    return m, errors
-
 def validate_bundle(pkg_dir: Path) -> tuple[dict, list[str]]:
-    manifest_path = pkg_dir / "manifest.json"
-    if not manifest_path.exists():
-        return {}, [f"manifest.json not found in {pkg_dir.name}"]
-    try:
-        m = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        return {}, [f"manifest.json is invalid JSON: {e}"]
-
-    errors = []
+    m, errors = _read_manifest(pkg_dir / "manifest.json")
+    if errors: return m, errors
     missing = [k for k in PACKAGE_REQUIRED if k not in m]
-    if missing:
-        errors.append(f"Missing required fields: {', '.join(missing)}")
+    if missing: errors.append(f"Missing required fields: {', '.join(missing)}")
     if "package_type" in m and m["package_type"] != "package":
         errors.append(f'package_type must be "package", got "{m["package_type"]}"')
-    if "version" in m:
-        errors.extend(validate_semver(m["version"], "version"))
+    if "version" in m: errors.extend(validate_semver(m["version"], "version"))
 
-    total = len(m.get("libraries", [])) + len(m.get("modules", [])) + len(m.get("packages", []))
+    total = (len(m.get("libraries", [])) + len(m.get("modules", [])) + len(m.get("packages", [])))
     if total == 0:
         errors.append("Bundle must contain at least one library, module, or nested package")
 
+    # Libraries live inside the package dir
     for lib_id in m.get("libraries", []):
-        lib_dir = LIBS / lib_id
+        lib_dir = pkg_dir / "libraries" / lib_id
         if not lib_dir.is_dir() or not (lib_dir / "manifest.json").exists():
-            errors.append(f'Referenced library "{lib_id}" not found in libraries/')
+            errors.append(f'Library "{lib_id}" not found at {lib_dir.relative_to(ROOT)}')
     for mod_id in m.get("modules", []):
         mod_dir = MODULES / mod_id
         if not mod_dir.is_dir() or not (mod_dir / "manifest.json").exists():
-            errors.append(f'Referenced module "{mod_id}" not found in modules/')
+            errors.append(f'Module "{mod_id}" not found in modules/')
     for pkg_id in m.get("packages", []):
-        nested_dir = PACKAGES / pkg_id
-        if not nested_dir.is_dir() or not (nested_dir / "manifest.json").exists():
-            errors.append(f'Referenced package "{pkg_id}" not found in packages/')
+        nested = PACKAGES / pkg_id
+        if not nested.is_dir() or not (nested / "manifest.json").exists():
+            errors.append(f'Nested package "{pkg_id}" not found in packages/')
     return m, errors
 
 
@@ -178,9 +143,7 @@ def bump_semver(version: str, part: str) -> str:
 def apply_version_bump(manifest_path: Path, part: str) -> str:
     text = manifest_path.read_text(encoding="utf-8")
     m = json.loads(text)
-    old_ver = m["version"]
-    new_ver = bump_semver(old_ver, part)
-    # Patch in-place preserving formatting
+    new_ver = bump_semver(m["version"], part)
     text = re.sub(
         r'("version"\s*:\s*)"[^"]+"',
         lambda mo: f'{mo.group(0).split(":")[0]}: "{new_ver}"',
@@ -212,12 +175,20 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+# ── Output path helpers ───────────────────────────────────────────────────────
+
+def out_dir(pkg_id: str, version: str) -> Path:
+    """Returns dist/<pkg_id>/<version>/ and ensures it exists."""
+    d = DIST / pkg_id / version
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 # ── Packaging ─────────────────────────────────────────────────────────────────
 
 def package_module(pkg_dir: Path, manifest: dict) -> Path:
-    DIST.mkdir(exist_ok=True)
     ver = manifest["version"]
-    out = DIST / f"{manifest['id']}-{ver}.gdmod"
+    out = out_dir(manifest["id"], ver) / f"{manifest['id']}-{ver}.gdmod"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.write(pkg_dir / "manifest.json", "manifest.json")
         scripts_dir = pkg_dir / "scripts"
@@ -228,55 +199,41 @@ def package_module(pkg_dir: Path, manifest: dict) -> Path:
         zf.writestr("build-meta.json", json.dumps(build_meta(manifest, "module"), indent=2))
     return out
 
-def package_library(pkg_dir: Path, manifest: dict) -> Path:
-    DIST.mkdir(exist_ok=True)
-    ver = manifest["version"]
-    out = DIST / f"{manifest['id']}-{ver}.gdlib"
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.write(pkg_dir / "manifest.json", "manifest.json")
-        entry_path = pkg_dir / manifest["entry"]
-        if entry_path.exists():
-            zf.write(entry_path, manifest["entry"])
-        for extra in sorted(pkg_dir.glob("*.rhai")):
-            rel = extra.relative_to(pkg_dir)
-            if rel.name != manifest["entry"]:
-                zf.write(extra, rel)
-        zf.writestr("build-meta.json", json.dumps(build_meta(manifest, "library"), indent=2))
-    return out
 
-def _add_library_to_zip(zf: zipfile.ZipFile, lib_id: str, prefix: str = "libraries"):
-    """Add a library from LIBS/<lib_id>/ into the zip under <prefix>/<lib_id>/."""
-    lib_dir = LIBS / lib_id
+def _add_library_to_zip(zf: zipfile.ZipFile, lib_dir: Path, lib_id: str, zip_prefix: str):
+    """Add a library from lib_dir into the zip under zip_prefix/lib_id/."""
     lib_m = json.loads((lib_dir / "manifest.json").read_text(encoding="utf-8"))
-    zf.write(lib_dir / "manifest.json", f"{prefix}/{lib_id}/manifest.json")
+    zf.write(lib_dir / "manifest.json", f"{zip_prefix}/{lib_id}/manifest.json")
     entry_path = lib_dir / lib_m["entry"]
     if entry_path.exists():
-        zf.write(entry_path, f"{prefix}/{lib_id}/{lib_m['entry']}")
+        zf.write(entry_path, f"{zip_prefix}/{lib_id}/{lib_m['entry']}")
     for extra in sorted(lib_dir.glob("*.rhai")):
         if extra.name != lib_m["entry"]:
-            zf.write(extra, f"{prefix}/{lib_id}/{extra.name}")
+            zf.write(extra, f"{zip_prefix}/{lib_id}/{extra.name}")
 
-def _add_module_to_zip(zf: zipfile.ZipFile, mod_id: str, prefix: str = "modules"):
-    """Add a module from MODULES/<mod_id>/ into the zip under <prefix>/<mod_id>/."""
+def _add_module_to_zip(zf: zipfile.ZipFile, mod_id: str, zip_prefix: str):
+    """Add a module from MODULES/mod_id into the zip under zip_prefix/mod_id/."""
     mod_dir = MODULES / mod_id
-    zf.write(mod_dir / "manifest.json", f"{prefix}/{mod_id}/manifest.json")
+    zf.write(mod_dir / "manifest.json", f"{zip_prefix}/{mod_id}/manifest.json")
     scripts_dir = mod_dir / "scripts"
     if scripts_dir.is_dir():
         for script in sorted(scripts_dir.rglob("*")):
             if script.is_file():
-                zf.write(script, f"{prefix}/{mod_id}/scripts/{script.relative_to(scripts_dir)}")
+                rel = script.relative_to(scripts_dir)
+                zf.write(script, f"{zip_prefix}/{mod_id}/scripts/{rel}")
 
-def _add_package_to_zip(zf: zipfile.ZipFile, pkg_id: str, prefix: str = "packages"):
-    """Recursively add a nested bundle from PACKAGES/<pkg_id>/ under <prefix>/<pkg_id>/."""
-    nested_dir = PACKAGES / pkg_id
-    nested_m = json.loads((nested_dir / "manifest.json").read_text(encoding="utf-8"))
-    zf.write(nested_dir / "manifest.json", f"{prefix}/{pkg_id}/manifest.json")
+def _add_package_to_zip(zf: zipfile.ZipFile, pkg_id: str, zip_prefix: str):
+    """Recursively add a nested bundle from PACKAGES/pkg_id under zip_prefix/pkg_id/."""
+    pkg_dir = PACKAGES / pkg_id
+    nested_m = json.loads((pkg_dir / "manifest.json").read_text(encoding="utf-8"))
+    zf.write(pkg_dir / "manifest.json", f"{zip_prefix}/{pkg_id}/manifest.json")
     for lib_id in nested_m.get("libraries", []):
-        _add_library_to_zip(zf, lib_id, prefix=f"{prefix}/{pkg_id}/libraries")
+        lib_dir = pkg_dir / "libraries" / lib_id
+        _add_library_to_zip(zf, lib_dir, lib_id, f"{zip_prefix}/{pkg_id}/libraries")
     for mod_id in nested_m.get("modules", []):
-        _add_module_to_zip(zf, mod_id, prefix=f"{prefix}/{pkg_id}/modules")
+        _add_module_to_zip(zf, mod_id, f"{zip_prefix}/{pkg_id}/modules")
     for sub_id in nested_m.get("packages", []):
-        _add_package_to_zip(zf, sub_id, prefix=f"{prefix}/{pkg_id}/packages")
+        _add_package_to_zip(zf, sub_id, f"{zip_prefix}/{pkg_id}/packages")
 
 def package_bundle(pkg_dir: Path, manifest: dict) -> Path:
     """Package a .gdpck bundle.
@@ -288,31 +245,27 @@ def package_bundle(pkg_dir: Path, manifest: dict) -> Path:
             <lib_id>/
                 manifest.json
                 <entry.rhai>
-                [extra .rhai files]
         modules/
             <mod_id>/
                 manifest.json
-                scripts/
-                    <script.rhai>
+                scripts/<script.rhai>
         packages/
-            <nested_pkg_id>/
+            <nested_pkg>/
                 manifest.json
                 libraries/ ...
-                modules/  ...
     """
-    DIST.mkdir(exist_ok=True)
     ver = manifest["version"]
-    out = DIST / f"{manifest['id']}-{ver}.gdpck"
-
+    out = out_dir(manifest["id"], ver) / f"{manifest['id']}-{ver}.gdpck"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.write(pkg_dir / "manifest.json", "manifest.json")
         zf.writestr("build-meta.json", json.dumps(build_meta(manifest, "package"), indent=2))
         for lib_id in manifest.get("libraries", []):
-            _add_library_to_zip(zf, lib_id)
+            lib_dir = pkg_dir / "libraries" / lib_id
+            _add_library_to_zip(zf, lib_dir, lib_id, "libraries")
         for mod_id in manifest.get("modules", []):
-            _add_module_to_zip(zf, mod_id)
+            _add_module_to_zip(zf, mod_id, "modules")
         for pkg_id in manifest.get("packages", []):
-            _add_package_to_zip(zf, pkg_id)
+            _add_package_to_zip(zf, pkg_id, "packages")
     return out
 
 
@@ -321,13 +274,14 @@ def package_bundle(pkg_dir: Path, manifest: dict) -> Path:
 def make_catalog_entry(manifest: dict, checksum: str, download_base: str, pkg_type: str) -> dict:
     pkg_id = manifest["id"]
     ver    = manifest["version"]
-    ext    = {"module": "gdmod", "library": "gdlib", "package": "gdpck"}.get(pkg_type, "gdmod")
+    ext    = {"module": "gdmod", "package": "gdpck"}.get(pkg_type, "gdmod")
+    filename = f"{pkg_id}-{ver}.{ext}"
     return {
         "id":              pkg_id,
         "name":            manifest["name"],
         "version":         ver,
         "min_app_version": manifest.get("min_app_version", "0.1.0"),
-        "author":          manifest["author"],
+        "author":          manifest.get("author", ""),
         "description":     manifest["description"],
         "icon":            manifest.get("icon", "custom"),
         "package_type":    pkg_type,
@@ -336,15 +290,16 @@ def make_catalog_entry(manifest: dict, checksum: str, download_base: str, pkg_ty
         "tags":            manifest.get("tags", []),
         "commands":        manifest.get("commands", []),
         "libraries":       manifest.get("libraries", []),
+        "modules":         manifest.get("modules", []),
         "checksum":        checksum,
         "pub_date":        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "download_url":    f"{download_base.rstrip('/')}/{pkg_id}-{ver}.{ext}" if download_base else "",
+        "download_url":    f"{download_base.rstrip('/')}/{filename}" if download_base else "",
     }
 
 
 # ── Publish ───────────────────────────────────────────────────────────────────
 
-def publish_entry(entry: dict, marketplace_url: str, token: str):
+def publish_entry(entry: dict, pkg_file: Path, marketplace_url: str, token: str):
     import urllib.request, urllib.error
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
@@ -397,7 +352,7 @@ def publish_entry(entry: dict, marketplace_url: str, token: str):
 
 def discover_packages() -> list[tuple[Path, str]]:
     pkgs = []
-    for kind, base in [("module", MODULES), ("library", LIBS), ("package", PACKAGES)]:
+    for kind, base in [("module", MODULES), ("package", PACKAGES)]:
         if base.is_dir():
             for d in sorted(base.iterdir()):
                 if d.is_dir() and (d / "manifest.json").exists():
@@ -410,10 +365,10 @@ def discover_packages() -> list[tuple[Path, str]]:
 def main():
     parser = argparse.ArgumentParser(description="Build GDLQBot packages")
     parser.add_argument("target",    nargs="?", help="Package ID to build (default: all)")
-    parser.add_argument("--validate", action="store_true", help="Validate only, no output files")
-    parser.add_argument("--bump",    choices=["patch", "minor", "major"], help="Bump version before building")
-    parser.add_argument("--since",   metavar="TAG", help="Only build packages changed since this git tag")
-    parser.add_argument("--publish", nargs=2, metavar=("URL", "TOKEN"), help="Publish to marketplace after building")
+    parser.add_argument("--validate", action="store_true")
+    parser.add_argument("--bump",    choices=["patch", "minor", "major"])
+    parser.add_argument("--since",   metavar="TAG")
+    parser.add_argument("--publish", nargs=2, metavar=("URL", "TOKEN"))
     args = parser.parse_args()
 
     marketplace_url, token = args.publish if args.publish else (None, None)
@@ -421,7 +376,7 @@ def main():
 
     packages = discover_packages()
     if not packages:
-        print(f"{RED}No packages found under modules/, libraries/, or packages/{RESET}")
+        print(f"{RED}No packages found under modules/ or packages/{RESET}")
         sys.exit(1)
 
     if args.target:
@@ -436,12 +391,11 @@ def main():
             print(f"{YELLOW}No packages changed since {args.since} — nothing to build.{RESET}")
             sys.exit(0)
         skipped = len(packages) - len(filtered)
-        if skipped:
-            print(f"{YELLOW}Skipping {skipped} unchanged package(s){RESET}")
+        if skipped: print(f"{YELLOW}Skipping {skipped} unchanged package(s){RESET}")
         packages = filtered
 
-    validate_fns = {"module": validate_module, "library": validate_library, "package": validate_bundle}
-    package_fns  = {"module": package_module,  "library": package_library,  "package": package_bundle}
+    validate_fns = {"module": validate_module, "package": validate_bundle}
+    package_fns  = {"module": package_module,  "package": package_bundle}
 
     any_error   = False
     catalog     = []
@@ -451,14 +405,12 @@ def main():
         head(f"{pkg_dir.name}  ({kind})")
 
         if args.bump:
-            manifest_path = pkg_dir / "manifest.json"
-            new_ver = apply_version_bump(manifest_path, args.bump)
+            new_ver = apply_version_bump(pkg_dir / "manifest.json", args.bump)
             ok(f"Bumped version -> {new_ver}")
 
         manifest, errors = validate_fns[kind](pkg_dir)
         if errors:
-            for e in errors:
-                err(e)
+            for e in errors: err(e)
             any_error = True
             continue
 
@@ -475,18 +427,19 @@ def main():
             continue
 
         checksum = sha256_file(out_file)
-        (DIST / f"{out_file.name}.sha256").write_text(f"{checksum}  {out_file.name}\n")
+        sha_path = out_file.parent / f"{out_file.name}.sha256"
+        sha_path.write_text(f"{checksum}  {out_file.name}\n")
         size_kb = out_file.stat().st_size // 1024
-        ok(f"-> dist/{out_file.name}  ({size_kb} KB)  sha256:{checksum[:12]}…")
+        rel = out_file.relative_to(ROOT)
+        ok(f"-> {rel}  ({size_kb} KB)  sha256:{checksum[:12]}…")
 
         entry = make_catalog_entry(manifest, checksum, marketplace_url or "", kind)
         catalog.append(entry)
-        built_files.append(entry)
+        built_files.append((entry, out_file))
 
     if not args.validate and catalog:
-        catalog_path = DIST / "catalog.json"
-        # Merge with existing catalog if present (don't overwrite unbuilt packages)
         existing: dict[str, dict] = {}
+        catalog_path = DIST / "catalog.json"
         if catalog_path.exists():
             try:
                 for e in json.loads(catalog_path.read_text(encoding="utf-8")):
@@ -501,9 +454,9 @@ def main():
 
     if marketplace_url and built_files:
         head("Publishing")
-        for entry in built_files:
+        for entry, pkg_file in built_files:
             try:
-                publish_entry(entry, marketplace_url, token)
+                publish_entry(entry, pkg_file, marketplace_url, token)
             except RuntimeError as ex:
                 err(str(ex))
                 any_error = True
