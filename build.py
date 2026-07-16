@@ -14,6 +14,7 @@ Usage:
   py build.py --since v1.2.0              only build packages changed since tag
   py build.py --publish <url> <token>      build + push to marketplace
   py build.py --publish <url> <token> --download-base <cdn-url>  publish with external download URLs
+  py build.py --github-repo owner/repo     embed GitHub source info in catalog entries
 """
 
 import argparse
@@ -272,12 +273,18 @@ def package_bundle(pkg_dir: Path, manifest: dict) -> Path:
 
 # ── Catalog ───────────────────────────────────────────────────────────────────
 
-def make_catalog_entry(manifest: dict, checksum: str, download_base: str, pkg_type: str) -> dict:
-    pkg_id = manifest["id"]
-    ver    = manifest["version"]
-    ext    = {"module": "gdmod", "package": "gdpck"}.get(pkg_type, "gdmod")
+def make_catalog_entry(
+    manifest: dict,
+    checksum: str,
+    download_base: str,
+    pkg_type: str,
+    github_repo: str = "",
+) -> dict:
+    pkg_id   = manifest["id"]
+    ver      = manifest["version"]
+    ext      = {"module": "gdmod", "package": "gdpck"}.get(pkg_type, "gdmod")
     filename = f"{pkg_id}-{ver}.{ext}"
-    return {
+    entry = {
         "id":              pkg_id,
         "name":            manifest["name"],
         "version":         ver,
@@ -296,6 +303,29 @@ def make_catalog_entry(manifest: dict, checksum: str, download_base: str, pkg_ty
         "pub_date":        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "download_url":    f"{download_base.rstrip('/')}/{filename}" if download_base else "",
     }
+    # Embed GitHub distribution metadata when a repo is provided.
+    # The installer reads dist/{pkg_id}/{version}/manifest.json from the repo.
+    if github_repo:
+        entry["source_type"]  = "github"
+        entry["github_repo"]  = github_repo
+        entry["github_dir"]   = f"dist/{pkg_id}"
+        entry["github_tag"]   = ""
+    return entry
+
+
+# ── Dist manifest ─────────────────────────────────────────────────────────────
+
+def write_dist_manifest(out_file: Path, manifest: dict, pkg_type: str, checksum: str):
+    """Write dist/<id>/<version>/manifest.json for the installer to read at install time."""
+    dist_m = {
+        "id":           manifest["id"],
+        "version":      manifest["version"],
+        "package_type": pkg_type,
+        "file":         out_file.name,
+        "checksum":     checksum,
+    }
+    dest = out_file.parent / "manifest.json"
+    dest.write_text(json.dumps(dist_m, indent=2), encoding="utf-8")
 
 
 # ── Publish ───────────────────────────────────────────────────────────────────
@@ -339,6 +369,11 @@ def publish_entry(entry: dict, pkg_file: Path, marketplace_url: str, token: str)
         "checksum":     entry["checksum"],
         "changelog":    entry.get("changelog", ""),
         "pub_date":     entry["pub_date"],
+        # GitHub distribution fields (forwarded to marketplace DB)
+        "source_type":  entry.get("source_type", "direct"),
+        "github_repo":  entry.get("github_repo", ""),
+        "github_dir":   entry.get("github_dir", ""),
+        "github_tag":   entry.get("github_tag", ""),
     }).encode()
     try:
         req = urllib.request.Request(
@@ -376,10 +411,15 @@ def main():
     parser.add_argument("--download-base", metavar="URL",
                         help="Base URL for file downloads (e.g. GitHub releases). "
                              "Separate from --publish which is the marketplace API URL.")
+    parser.add_argument("--github-repo", metavar="OWNER/REPO",
+                        help="Embed GitHub source info in catalog entries so the app "
+                             "can install directly from the repo's dist tree. "
+                             "Example: GD-LevelReqBot/marketplace")
     args = parser.parse_args()
 
     marketplace_url, token = args.publish if args.publish else (None, None)
     download_base = args.download_base or ""
+    github_repo   = args.github_repo   or ""
     changed_since = git_changed_since(args.since) if args.since else None
 
     packages = discover_packages()
@@ -441,7 +481,12 @@ def main():
         rel = out_file.relative_to(ROOT)
         ok(f"-> {rel}  ({size_kb} KB)  sha256:{checksum[:12]}…")
 
-        entry = make_catalog_entry(manifest, checksum, download_base, kind)
+        # Write the dist manifest — tells the installer what file to download
+        # and its checksum, without needing to enumerate source files.
+        write_dist_manifest(out_file, manifest, kind, checksum)
+        ok(f"-> dist/{manifest['id']}/{manifest['version']}/manifest.json")
+
+        entry = make_catalog_entry(manifest, checksum, download_base, kind, github_repo)
         catalog.append(entry)
         built_files.append((entry, out_file))
 
