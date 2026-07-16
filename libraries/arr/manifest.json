@@ -1,0 +1,13 @@
+{
+  "id": "arr",
+  "name": "Array Utilities",
+  "version": "1.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Team",
+  "description": "Higher-order array helpers: page, find, sort_by, group_by, partition, chunk, flatten, zip, unique, and more.",
+  "package_type": "library",
+  "icon": "layers",
+  "verified": true,
+  "tags": ["official", "stdlib", "utility"],
+  "entry": "arr.rhai"
+}

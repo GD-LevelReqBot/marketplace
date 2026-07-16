@@ -1,0 +1,13 @@
+{
+  "id": "io",
+  "name": "I/O Utilities",
+  "version": "1.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Team",
+  "description": "Data parsing and formatting: format_table, kv_parse, query_parse, split_trim, kv_encode, coalesce, thousands separator, word_wrap.",
+  "package_type": "library",
+  "icon": "terminal",
+  "verified": true,
+  "tags": ["official", "stdlib", "utility"],
+  "entry": "io.rhai"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "math",
+  "name": "Math Utilities",
+  "version": "1.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Team",
+  "description": "Mathematical utilities not covered by Rhai built-ins: clamp, lerp, map_range, average, median, std_dev, gcd, lcm, factorial, round_to, snap, and more.",
+  "package_type": "library",
+  "icon": "sigma",
+  "verified": true,
+  "tags": ["official", "stdlib", "utility", "math"],
+  "entry": "math.rhai"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "polls",
+  "name": "Polls",
+  "version": "1.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Team",
+  "description": "Run live chat polls with multiple choice options.",
+  "icon": "poll",
+  "verified": true,
+  "tags": ["official", "engagement", "polls"],
+  "commands": [
+    { "trigger": "!poll",        "aliases": [],  "description": "Create a poll",              "builtin_key": "poll_create",  "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!vote",        "aliases": [],  "description": "Vote in the active poll",    "builtin_key": "poll_vote",    "required_badges": [],                          "enabled": true },
+    { "trigger": "!endpoll",     "aliases": [],  "description": "End the active poll",        "builtin_key": "poll_end",     "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!pollresults", "aliases": [],  "description": "Show current poll results",  "builtin_key": "poll_results", "required_badges": [],                          "enabled": true }
+  ],
+  "panels": [
+    {
+      "id": "poll",
+      "label": "Poll",
+      "widgets": [
+        {
+          "widget_type": "PollPanel",
+          "active_expr":   "ms.get(\"active\")",
+          "question_expr": "ms.get(\"question\")",
+          "options_expr":  "ms.get(\"options\")",
+          "votes_expr":    "ms.get(\"votes\")"
+        }
+      ]
+    }
+  ],
+  "scripts": {
+    "poll_create":  "scripts/create.rhai",
+    "poll_vote":    "scripts/vote.rhai",
+    "poll_end":     "scripts/end.rhai",
+    "poll_results": "scripts/results.rhai"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "fmt",
+  "name": "Formatting Utilities",
+  "version": "1.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Team",
+  "description": "Text and number formatting: compact (1.2K/M), duration, ordinal, percent, percent_of, bytes, natural_list, pluralize, currency, zero_pad, sign_str, title_case, upper_first, pad, truncate.",
+  "package_type": "library",
+  "icon": "type",
+  "verified": true,
+  "tags": ["official", "stdlib", "utility"],
+  "entry": "fmt.rhai"
+}

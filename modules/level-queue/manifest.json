@@ -1,0 +1,79 @@
+{
+  "id": "level-queue",
+  "name": "Level Queue",
+  "version": "2.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Team",
+  "description": "Manage a Geometry Dash level request queue from your chat.",
+  "icon": "queue",
+  "verified": true,
+  "tags": ["official", "geometry-dash", "queue"],
+  "commands": [
+    { "trigger": "!r",        "aliases": ["!request"], "description": "Add a level to the queue",            "builtin_key": "request",      "required_badges": [],                          "enabled": true },
+    { "trigger": "!next",     "aliases": [],           "description": "Pop the next level from the queue",   "builtin_key": "next",         "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!list",     "aliases": [],           "description": "Show the current queue",              "builtin_key": "list",         "required_badges": [],                          "enabled": true },
+    { "trigger": "!pos",      "aliases": ["!position"],"description": "Get your position in the queue",     "builtin_key": "position",     "required_badges": [],                          "enabled": true },
+    { "trigger": "!remove",   "aliases": [],           "description": "Remove a level from the queue",       "builtin_key": "remove",       "required_badges": [],                          "enabled": true },
+    { "trigger": "!clear",    "aliases": [],           "description": "Clear the entire queue",              "builtin_key": "clear",        "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!open",     "aliases": [],           "description": "Open the queue for requests",         "builtin_key": "open_queue",   "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!close",    "aliases": [],           "description": "Close the queue",                     "builtin_key": "close_queue",  "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!mylevels", "aliases": [],           "description": "Show your levels in the queue",       "builtin_key": "my_levels",    "required_badges": [],                          "enabled": true },
+    { "trigger": "!promote",  "aliases": [],           "description": "Move a level to the front",           "builtin_key": "promote",      "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!shuffle",  "aliases": [],           "description": "Shuffle the queue order",             "builtin_key": "shuffle",      "required_badges": ["moderator","broadcaster"], "enabled": true }
+  ],
+  "panels": [
+    {
+      "id": "queue",
+      "label": "Queue",
+      "widgets": [
+        {
+          "widget_type": "QueuePanel",
+          "viewer_data_expr": "ms.collection(\"viewer\").all()",
+          "subscriber_data_expr": "ms.collection(\"subscriber\").all()",
+          "open_expr": "ms.get(\"open\")",
+          "max_size_expr": "ms.get(\"max_size\")"
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "label": "History",
+      "widgets": [
+        {
+          "widget_type": "HistoryPanel",
+          "data_expr": "ms.collection(\"history\").find(100)"
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "widgets": [
+        {
+          "widget_type": "ModuleSettings",
+          "fields": [
+            { "key": "max_size",     "label": "Max Queue Size",     "type": "number",  "default": 25 },
+            { "key": "viewer_limit", "label": "Viewer Limit",       "type": "number",  "default": 1 },
+            { "key": "sub_limit",    "label": "Subscriber Limit",   "type": "number",  "default": 2 },
+            { "key": "sub_mode",     "label": "Subscriber Priority","type": "toggle",  "default": false },
+            { "key": "open",         "label": "Queue Open",         "type": "toggle",  "default": true }
+          ]
+        }
+      ]
+    }
+  ],
+  "scripts": {
+    "request":       "scripts/request.rhai",
+    "next":          "scripts/next.rhai",
+    "list":          "scripts/list.rhai",
+    "position":      "scripts/position.rhai",
+    "remove":        "scripts/remove.rhai",
+    "clear":         "scripts/clear.rhai",
+    "clear_history": "scripts/clear_history.rhai",
+    "open_queue":    "scripts/open.rhai",
+    "close_queue":   "scripts/close.rhai",
+    "my_levels":     "scripts/my_levels.rhai",
+    "promote":       "scripts/promote.rhai",
+    "shuffle":       "scripts/shuffle.rhai"
+  }
+}

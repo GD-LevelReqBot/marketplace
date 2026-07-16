@@ -1,0 +1,86 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Package ID to build (leave blank for all)'
+        required: false
+        default: ''
+      publish:
+        description: 'Publish to marketplace after building'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate & build
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          if [ -n "$TARGET" ]; then
+            python3 build.py "$TARGET" --validate
+            python3 build.py "$TARGET"
+          else
+            python3 build.py --validate
+            python3 build.py
+          fi
+
+      - name: List output
+        run: ls -lh dist/
+
+      - name: Publish to marketplace
+        if: ${{ github.event.inputs.publish == 'true' || startsWith(github.ref, 'refs/tags/') }}
+        env:
+          MARKETPLACE_URL: https://dl.supers0ft.us/gdlvlreqbot/marketplace
+          MARKETPLACE_TOKEN: ${{ secrets.MARKETPLACE_TOKEN }}
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          if [ -n "$TARGET" ]; then
+            python3 build.py "$TARGET" --publish "$MARKETPLACE_URL" "$MARKETPLACE_TOKEN"
+          else
+            python3 build.py --publish "$MARKETPLACE_URL" "$MARKETPLACE_TOKEN"
+          fi
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## GDLQBot Package Release ${{ github.ref_name }}
+
+            Official modules and libraries for [GD Level Request Bot](https://github.com/Supernova3339/gd-levelreqbot).
+
+            ### Installing
+            Open **Modules** in GDLQBot and click **Install** on any package.
+
+            ### Included
+            See `catalog.json` for the full listing.
+          files: |
+            dist/*.gdmod
+            dist/*.gdlib
+            dist/*.gdpck
+            dist/*.sha256
+            dist/catalog.json
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (non-tag runs)
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ github.sha }}
+          path: dist/
+          retention-days: 7

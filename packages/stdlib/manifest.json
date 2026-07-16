@@ -1,0 +1,14 @@
+{
+  "id": "stdlib",
+  "name": "Standard Library",
+  "version": "1.0.0",
+  "author": "GDLQBot Team",
+  "description": "Standard utilities for RHAI Script Engine.",
+  "package_type": "package",
+  "icon": "layers",
+  "verified": true,
+  "tags": ["official", "package"],
+  "libraries": ["arr", "str", "math", "fmt", "io"],
+  "modules": [],
+  "packages": []
+}

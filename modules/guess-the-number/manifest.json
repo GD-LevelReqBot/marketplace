@@ -1,0 +1,32 @@
+{
+  "id": "guess-the-number",
+  "name": "Guess the Number",
+  "version": "1.0.0",
+  "min_app_version": "0.1.0",
+  "author": "GDLQBot Community",
+  "description": "Run a guess-the-number mini-game with your chat.",
+  "icon": "custom",
+  "verified": false,
+  "tags": ["community", "fun", "games"],
+  "commands": [
+    { "trigger": "!gtn",   "aliases": [],  "description": "Start a guess-the-number game",  "builtin_key": "start", "required_badges": ["moderator","broadcaster"], "enabled": true },
+    { "trigger": "!guess", "aliases": [],  "description": "Guess a number",                 "builtin_key": "guess", "required_badges": [],                          "enabled": true }
+  ],
+  "panels": [
+    {
+      "id": "game",
+      "label": "Game",
+      "widgets": [
+        {
+          "widget_type": "StatCard",
+          "label": "Guesses this round",
+          "value_expr": "ms.get(\"guesses\") ?? 0"
+        }
+      ]
+    }
+  ],
+  "scripts": {
+    "start": "scripts/start.rhai",
+    "guess": "scripts/guess.rhai"
+  }
+}
