@@ -7,13 +7,6 @@ Official and community modules for [GD Level Request Bot](https://github.com/Sup
 | Module | Description | Commands |
 |--------|-------------|----------|
 | **Level Queue** | Manage a GD level request queue from chat | `!r`, `!next`, `!list`, `!pos`, `!remove`, `!clear`, `!open`, `!close`, `!mylevels`, `!promote`, `!shuffle` |
-| **Song Queue** | Let viewers request songs during your stream | `!sr`, `!nowplaying`, `!playlist`, `!skipsong` |
-| **Points** | Track a channel currency viewers earn and spend | `!points`, `!give`, `!top`, `!addpoints` |
-| **Polls** | Run live chat polls with multiple choice options | `!poll`, `!vote`, `!endpoll`, `!pollresults` |
-| **Quote Manager** | Store and display memorable stream quotes | `!quote`, `!addquote`, `!delquote` |
-| **Hype Counter** | Track hype with a fun chat command | `!hype`, `!resethype` |
-| **Shoutout** | Give shoutouts to other streamers | `!so` |
-| **Guess the Number** | Run a guess-the-number mini-game | `!gtn`, `!guess` |
 
 ## Installing Modules
 
