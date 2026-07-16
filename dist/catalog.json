@@ -129,9 +129,9 @@
     ],
     "libraries": [],
     "modules": [],
-    "checksum": "7d7a41b8c36c270d12cbeb04e003e538ed2a409f7a314f5fc3878fb328ddfe6d",
-    "pub_date": "2026-07-16T05:28:44Z",
-    "download_url": ""
+    "checksum": "0457f868b512d4da489b821fb8774b0cb7162fd748a4ece017f9332b0d7595bc",
+    "pub_date": "2026-07-16T06:04:36Z",
+    "download_url": "https://dl.supers0ft.us/gdlvlreqbot/marketplace/level-queue-2.0.0.gdmod"
   },
   {
     "id": "stdlib",
@@ -157,8 +157,8 @@
       "io"
     ],
     "modules": [],
-    "checksum": "0e8c272eab85c0ab507c4f5ed83e208228a81f61fc0a2ac0ba60a5834990208b",
-    "pub_date": "2026-07-16T05:28:44Z",
-    "download_url": ""
+    "checksum": "bd4f9178fd528c563ddacce4a01e31048cc0613e16696f89a3b03d7d19895a6d",
+    "pub_date": "2026-07-16T06:08:01Z",
+    "download_url": "https://dl.supers0ft.us/gdlvlreqbot/marketplace/stdlib-1.0.0.gdpck"
   }
 ]
