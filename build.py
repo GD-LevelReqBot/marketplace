@@ -15,6 +15,9 @@ Usage:
   py build.py --publish <url> <token>      build + push to marketplace
   py build.py --publish <url> <token> --download-base <cdn-url>  publish with external download URLs
   py build.py --github-repo owner/repo     embed GitHub source info in catalog entries
+  py build.py level-queue --watch          build then rebuild on any file change (dev mode)
+  py build.py level-queue --dev-install /path/to/app/modules
+                                           copy module source into a running app's modules dir
 """
 
 import argparse
@@ -22,8 +25,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import time
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -102,6 +107,18 @@ def validate_module(pkg_dir: Path) -> tuple[dict, list[str]]:
         for key, rel_path in m["scripts"].items():
             if not (pkg_dir / rel_path).exists():
                 errors.append(f'Script "{key}" -> "{rel_path}" not found')
+    for page in m.get("pages", []):
+        page_file = page.get("file", "")
+        if not page_file:
+            errors.append(f'Page "{page.get("id", "?")}" is missing a "file" field')
+        elif not (pkg_dir / page_file).exists():
+            errors.append(f'Page "{page.get("id", "?")}" -> "{page_file}" not found')
+    if "settings_page" in m and not (pkg_dir / m["settings_page"]).exists():
+        errors.append(f'settings_page "{m["settings_page"]}" not found')
+    for lib_def in m.get("bundle", {}).get("libraries", []):
+        lib_file = lib_def.get("file", "")
+        if lib_file and not (pkg_dir / lib_file).exists():
+            errors.append(f'Bundled library "{lib_def.get("name", "?")}" -> "{lib_file}" not found')
     return m, errors
 
 def validate_bundle(pkg_dir: Path) -> tuple[dict, list[str]]:
@@ -188,16 +205,32 @@ def out_dir(pkg_id: str, version: str) -> Path:
 
 # ── Packaging ─────────────────────────────────────────────────────────────────
 
+def _add_dir_to_zip(zf: zipfile.ZipFile, src: Path, arc_prefix: str):
+    """Recursively add all files in src to the zip under arc_prefix/."""
+    if not src.is_dir():
+        return
+    for f in sorted(src.rglob("*")):
+        if f.is_file():
+            zf.write(f, f"{arc_prefix}/{f.relative_to(src)}")
+
+
 def package_module(pkg_dir: Path, manifest: dict) -> Path:
     ver = manifest["version"]
     out = out_dir(manifest["id"], ver) / f"{manifest['id']}-{ver}.gdmod"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.write(pkg_dir / "manifest.json", "manifest.json")
-        scripts_dir = pkg_dir / "scripts"
-        if scripts_dir.is_dir():
-            for script in sorted(scripts_dir.rglob("*")):
-                if script.is_file():
-                    zf.write(script, script.relative_to(pkg_dir))
+        _add_dir_to_zip(zf, pkg_dir / "scripts",   "scripts")
+        _add_dir_to_zip(zf, pkg_dir / "ui",        "ui")
+        _add_dir_to_zip(zf, pkg_dir / "resources", "resources")
+        # Include bundled libraries declared in manifest.bundle.libraries
+        for lib_def in manifest.get("bundle", {}).get("libraries", []):
+            lib_file = pkg_dir / lib_def["file"]
+            if lib_file.exists():
+                zf.write(lib_file, lib_def["file"])
+            else:
+                warn(f"Bundled library file not found: {lib_def['file']}")
+        # Include full libraries/ subdirectory (manifests + all .rhai files)
+        _add_dir_to_zip(zf, pkg_dir / "libraries", "libraries")
         zf.writestr("build-meta.json", json.dumps(build_meta(manifest, "module"), indent=2))
     return out
 
@@ -217,12 +250,13 @@ def _add_module_to_zip(zf: zipfile.ZipFile, mod_id: str, zip_prefix: str):
     """Add a module from MODULES/mod_id into the zip under zip_prefix/mod_id/."""
     mod_dir = MODULES / mod_id
     zf.write(mod_dir / "manifest.json", f"{zip_prefix}/{mod_id}/manifest.json")
-    scripts_dir = mod_dir / "scripts"
-    if scripts_dir.is_dir():
-        for script in sorted(scripts_dir.rglob("*")):
-            if script.is_file():
-                rel = script.relative_to(scripts_dir)
-                zf.write(script, f"{zip_prefix}/{mod_id}/scripts/{rel}")
+    for sub in ("scripts", "ui", "resources", "libraries"):
+        sub_dir = mod_dir / sub
+        if sub_dir.is_dir():
+            for f in sorted(sub_dir.rglob("*")):
+                if f.is_file():
+                    rel = f.relative_to(sub_dir)
+                    zf.write(f, f"{zip_prefix}/{mod_id}/{sub}/{rel}")
 
 def _add_package_to_zip(zf: zipfile.ZipFile, pkg_id: str, zip_prefix: str):
     """Recursively add a nested bundle from PACKAGES/pkg_id under zip_prefix/pkg_id/."""
@@ -415,12 +449,37 @@ def main():
                         help="Embed GitHub source info in catalog entries so the app "
                              "can install directly from the repo's dist tree. "
                              "Example: GD-LevelReqBot/marketplace")
+    parser.add_argument("--watch", action="store_true",
+                        help="After building, watch for file changes and rebuild automatically. "
+                             "Requires --target (a single package ID).")
+    parser.add_argument("--dev-install", metavar="MODULES_DIR",
+                        help="Copy the module source directory into a running app's modules folder "
+                             "for live testing. Requires --target. Does not build a .gdmod — "
+                             "the app hot-reloads the source directory directly.")
     args = parser.parse_args()
 
     marketplace_url, token = args.publish if args.publish else (None, None)
     download_base = args.download_base or ""
     github_repo   = args.github_repo   or ""
     changed_since = git_changed_since(args.since) if args.since else None
+
+    # ── Dev-install: copy source dir into a running app's modules folder ─────
+    if args.dev_install:
+        if not args.target:
+            print(f"{RED}--dev-install requires a target package ID{RESET}")
+            sys.exit(1)
+        pkg_dir  = MODULES / args.target
+        if not pkg_dir.is_dir():
+            print(f"{RED}Module '{args.target}' not found under modules/{RESET}")
+            sys.exit(1)
+        dest = Path(args.dev_install) / args.target
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(pkg_dir, dest)
+        ok(f"Installed '{args.target}' -> {dest}")
+        print(f"\n{GREEN}{BOLD}Dev install complete.{RESET}  "
+              f"Enable the module in the app, then use --watch to auto-rebuild on changes.")
+        sys.exit(0)
 
     packages = discover_packages()
     if not packages:
@@ -517,9 +576,63 @@ def main():
     print()
     if any_error:
         print(f"{RED}{BOLD}Build finished with errors.{RESET}")
-        sys.exit(1)
+        if not args.watch:
+            sys.exit(1)
     else:
         print(f"{GREEN}{BOLD}Done.{RESET}")
+
+    # ── Watch mode: rebuild on any source file change ─────────────────────────
+    if args.watch:
+        if not args.target:
+            print(f"{RED}--watch requires a target package ID{RESET}")
+            sys.exit(1)
+        watch_root = MODULES / args.target
+        if not watch_root.is_dir():
+            watch_root = PACKAGES / args.target
+        if not watch_root.is_dir():
+            print(f"{RED}Package '{args.target}' not found{RESET}")
+            sys.exit(1)
+
+        print(f"\n{CYAN}Watching {watch_root.relative_to(ROOT)} for changes…  (Ctrl+C to stop){RESET}\n")
+
+        def _snapshot(root: Path) -> dict[Path, float]:
+            snap = {}
+            for f in root.rglob("*"):
+                if f.is_file():
+                    try:
+                        snap[f] = f.stat().st_mtime
+                    except OSError:
+                        pass
+            return snap
+
+        prev = _snapshot(watch_root)
+        try:
+            while True:
+                time.sleep(1)
+                curr = _snapshot(watch_root)
+                changed_files = [
+                    f for f, mt in curr.items()
+                    if prev.get(f) != mt
+                ] + [f for f in prev if f not in curr]
+
+                if changed_files:
+                    rel_names = [f.relative_to(watch_root) for f in changed_files[:3]]
+                    extra = len(changed_files) - 3
+                    label = ", ".join(str(r) for r in rel_names)
+                    if extra > 0: label += f" (+{extra} more)"
+                    print(f"  {CYAN}changed{RESET} {label} — rebuilding…")
+
+                    # Re-run the same build logic for the target
+                    sub = [sys.executable, __file__, args.target]
+                    if args.validate: sub.append("--validate")
+                    result = subprocess.run(sub, cwd=ROOT)
+                    if result.returncode == 0:
+                        print(f"  {GREEN}ok{RESET}   rebuild complete\n")
+                    else:
+                        print(f"  {RED}ERR{RESET}  rebuild had errors\n")
+                    prev = _snapshot(watch_root)
+        except KeyboardInterrupt:
+            print(f"\n{YELLOW}Watch stopped.{RESET}")
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 {
   "id": "level-queue",
   "name": "Level Queue",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "min_app_version": "0.1.0",
   "author": "GDLQBot Team",
   "description": "Manage a Geometry Dash level request queue from your chat.",
@@ -21,59 +21,32 @@
     { "trigger": "!promote",  "aliases": [],           "description": "Move a level to the front",           "builtin_key": "promote",      "required_badges": ["moderator","broadcaster"], "enabled": true },
     { "trigger": "!shuffle",  "aliases": [],           "description": "Shuffle the queue order",             "builtin_key": "shuffle",      "required_badges": ["moderator","broadcaster"], "enabled": true }
   ],
-  "panels": [
-    {
-      "id": "queue",
-      "label": "Queue",
-      "widgets": [
-        {
-          "widget_type": "QueuePanel",
-          "viewer_data_expr": "ms.collection(\"viewer\").all()",
-          "subscriber_data_expr": "ms.collection(\"subscriber\").all()",
-          "open_expr": "ms.get(\"open\")",
-          "max_size_expr": "ms.get(\"max_size\")"
-        }
-      ]
-    },
-    {
-      "id": "history",
-      "label": "History",
-      "widgets": [
-        {
-          "widget_type": "HistoryPanel",
-          "data_expr": "ms.collection(\"history\").find(100)"
-        }
-      ]
-    },
-    {
-      "id": "settings",
-      "label": "Settings",
-      "widgets": [
-        {
-          "widget_type": "ModuleSettings",
-          "fields": [
-            { "key": "max_size",     "label": "Max Queue Size",     "type": "number",  "default": 25 },
-            { "key": "viewer_limit", "label": "Viewer Limit",       "type": "number",  "default": 1 },
-            { "key": "sub_limit",    "label": "Subscriber Limit",   "type": "number",  "default": 2 },
-            { "key": "sub_mode",     "label": "Subscriber Priority","type": "toggle",  "default": false },
-            { "key": "open",         "label": "Queue Open",         "type": "toggle",  "default": true }
-          ]
-        }
-      ]
-    }
+  "pages": [
+    { "id": "queue", "label": "Queue", "icon": "queue", "file": "ui/queue.gdui" }
   ],
+  "settings_page": "ui/settings.gdui",
+  "bundle": {
+    "libraries": [
+      {
+        "name": "queue-core",
+        "file": "libraries/queue-core/queue_core.rhai",
+        "description": "Core queue operations: requests, positions, history, promote/shuffle"
+      }
+    ]
+  },
   "scripts": {
-    "request":       "scripts/request.rhai",
-    "next":          "scripts/next.rhai",
-    "list":          "scripts/list.rhai",
-    "position":      "scripts/position.rhai",
-    "remove":        "scripts/remove.rhai",
-    "clear":         "scripts/clear.rhai",
-    "clear_history": "scripts/clear_history.rhai",
-    "open_queue":    "scripts/open.rhai",
-    "close_queue":   "scripts/close.rhai",
-    "my_levels":     "scripts/my_levels.rhai",
-    "promote":       "scripts/promote.rhai",
-    "shuffle":       "scripts/shuffle.rhai"
+    "request":       "scripts/commands/request.rhai",
+    "next":          "scripts/commands/next.rhai",
+    "list":          "scripts/commands/list.rhai",
+    "position":      "scripts/commands/position.rhai",
+    "remove":        "scripts/commands/remove.rhai",
+    "clear":         "scripts/commands/clear.rhai",
+    "clear_history": "scripts/commands/clear_history.rhai",
+    "open_queue":    "scripts/commands/open.rhai",
+    "close_queue":   "scripts/commands/close.rhai",
+    "my_levels":     "scripts/commands/my_levels.rhai",
+    "promote":       "scripts/commands/promote.rhai",
+    "shuffle":       "scripts/commands/shuffle.rhai",
+    "save_settings": "scripts/ui/save_settings.rhai"
   }
 }

@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Page id="queue" label="Queue" icon="queue">
+  <TwoColumn leftWidth="300">
+
+    <!-- ── Left: header row + next button + stats + queue tabs ──────────────── -->
+    <Left>
+      <Stack fill="true">
+
+        <!-- Header: open/closed status, total count, overflow actions -->
+        <Stack direction="horizontal" gap="8" align="center" style="padding: 6px 10px; flex-shrink: 0; border-bottom: 1px solid #161616;">
+          <Conditional showExpr="ms.get_or('open', true)">
+            <Button label="Open"   icon="circle-check" actionKey="close_queue" variant="success"/>
+            <Button label="Closed" icon="circle-x"     actionKey="open_queue"  variant="danger"/>
+          </Conditional>
+          <Text value="to_string(ms.collection('subscriber').count() + ms.collection('viewer').count()) + '/' + to_string(ms.get_or('max_size', 25))" style="muted"/>
+          <Spacer/>
+          <ActionMenu label="···" variant="ghost">
+            <Action label="Shuffle"   key="shuffle"/>
+            <Action label="Clear All" key="clear"         style="danger"/>
+            <Action label="History"   navigateTo="history"/>
+          </ActionMenu>
+        </Stack>
+
+        <!-- Primary action: full-width prominent next button -->
+        <Inset padding="8 12">
+          <Button label="Next Level" icon="fast-forward" actionKey="next" variant="primary" fullWidth="true"/>
+        </Inset>
+
+        <!-- Inline stats row -->
+        <StatBar>
+          <Stat icon="lucide:crown" valueExpr="ms.collection('subscriber').count()" label="subs"/>
+          <Stat icon="lucide:users" valueExpr="ms.collection('viewer').count()"     label="viewers"/>
+          <Stat icon="lucide:list"  valueExpr="ms.get_or('max_size', 25)"           label="max"/>
+        </StatBar>
+
+        <!-- Queue tabs (switching clears right-panel selection) -->
+        <Tabs selectionKey="selected" variant="boxed">
+          <Tab label="Subscribers" icon="lucide:crown" badgeExpr="ms.collection('subscriber').count()">
+            <List
+              rowId="_id"
+              primary="username"
+              secondary="level_id"
+              secondaryPrefix="#"
+              platform="platform"
+              positionField="position"
+              selectionKey="selected"
+              emptyMessage="No subscriber requests yet">
+              <Section dataExpr="ms.collection('subscriber').all()"/>
+              <RowAction label="Promote" key="promote" argField="level_id"/>
+              <RowAction label="Remove"  key="remove"  argField="level_id" style="danger"/>
+            </List>
+          </Tab>
+          <Tab label="Viewers" icon="lucide:users" badgeExpr="ms.collection('viewer').count()">
+            <List
+              rowId="_id"
+              primary="username"
+              secondary="level_id"
+              secondaryPrefix="#"
+              platform="platform"
+              positionField="position"
+              selectionKey="selected"
+              emptyMessage="No viewer requests yet">
+              <Section dataExpr="ms.collection('viewer').all()"/>
+              <RowAction label="Promote" key="promote" argField="level_id"/>
+              <RowAction label="Remove"  key="remove"  argField="level_id" style="danger"/>
+            </List>
+          </Tab>
+        </Tabs>
+
+      </Stack>
+    </Left>
+
+    <!-- ── Right: selected item detail ───────────────────────────────────── -->
+    <Right>
+      <Stack fill="true">
+
+        <Conditional showKey="selected">
+
+          <!-- THEN: item selected — header + tabbed detail -->
+          <Stack fill="true" gap="0">
+
+            <!-- Compact header: username, level ID, position badge -->
+            <Inset padding="14 16 10">
+              <Stack direction="horizontal" gap="10" align="center">
+                <Stack gap="2" style="flex: 1; min-width: 0;">
+                  <Text value="'@' + selected.username"              style="subtitle"/>
+                  <Text value="'Level #' + to_string(selected.level_id)" style="muted"/>
+                </Stack>
+                <Badge value="'#' + to_string(selected.position)" variant="accent"/>
+              </Stack>
+            </Inset>
+
+            <!-- Tabs: queue actions vs. level data -->
+            <Tabs variant="boxed">
+
+              <Tab label="Actions" icon="lucide:zap">
+                <Stack gap="8" style="padding: 14px 16px; flex-shrink: 0;">
+                  <Button label="Promote to Top"      icon="arrow-up"  actionKey="promote" argState="selected.level_id" variant="ghost"  fullWidth="true"/>
+                  <Button label="Remove from Queue"   icon="trash-2"   actionKey="remove"  argState="selected.level_id" variant="danger" fullWidth="true"/>
+                </Stack>
+              </Tab>
+
+              <Tab label="Level Info" icon="lucide:layers">
+                <ScrollArea fill="true">
+                  <Stack gap="0">
+
+                    <Conditional showExpr="ms.get_or('gd_enabled', true)">
+
+                      <!-- GD enabled: thumbnail + level fields -->
+                      <Stack gap="0">
+                        <Conditional showExpr="ms.get_or('gd_thumbnails', true)">
+                          <Image
+                            srcExpr="'https://levelthumbs.prevter.me/thumbnail/' + to_string(selected.level_id)"
+                            height="150"/>
+                        </Conditional>
+                        <Inset padding="12 16 6">
+                          <SectionHeader label="Level Details"/>
+                        </Inset>
+                        <DetailCard
+                          dataExpr="gd.fetch(to_string(selected.level_id))"
+                          placeholder="Loading level data…">
+                          <Field key="name"        label="Level Name"/>
+                          <Field key="difficulty"  label="Difficulty"  type="badge"/>
+                          <Field key="stars"       label="Stars"       type="stars"/>
+                          <Field key="downloads"   label="Downloads"   type="number"/>
+                          <Field key="likes"       label="Likes"       type="number"/>
+                          <Field key="length"      label="Length"/>
+                          <Field key="is_demon"    label="Demon"       type="boolean"/>
+                          <Field key="is_featured" label="Featured"    type="boolean"/>
+                          <Field key="is_epic"     label="Epic"        type="boolean"/>
+                        </DetailCard>
+                      </Stack>
+
+                      <!-- GD disabled: callout -->
+                      <Stack style="padding: 14px 16px;">
+                        <CalloutBox kind="note" title="GD Integration Disabled" message="Enable GD data in module settings to view level details."/>
+                      </Stack>
+
+                    </Conditional>
+
+                  </Stack>
+                </ScrollArea>
+              </Tab>
+
+            </Tabs>
+
+          </Stack>
+
+          <!-- ELSE: nothing selected -->
+          <EmptyState icon="lucide:layers" message="Select a request from the queue to view level details."/>
+
+        </Conditional>
+
+      </Stack>
+    </Right>
+
+  </TwoColumn>
+
+  <!-- ── History sub-page ──────────────────────────────────────────────────── -->
+  <SubPage id="history">
+    <TwoColumn leftWidth="300">
+
+      <Left>
+        <Stack fill="true">
+
+          <!-- Header: count + clear action + back navigation -->
+          <Stack direction="horizontal" gap="8" align="center" style="padding: 6px 10px; flex-shrink: 0; border-bottom: 1px solid #161616;">
+            <Text value="to_string(ms.collection('history').count()) + ' played'" style="muted"/>
+            <Spacer/>
+            <ActionMenu label="···" variant="ghost">
+              <Action label="Clear History" key="clear_history" style="danger"/>
+            </ActionMenu>
+            <Button label="Back" icon="arrow-left" navigateTo=".."/>
+          </Stack>
+
+          <List
+            rowId="level_id"
+            primary="username"
+            secondary="level_id"
+            secondaryPrefix="#"
+            platform="platform"
+            badgeField="queue_type"
+            selectionKey="history_selected"
+            emptyMessage="No levels have been played yet">
+            <Section dataExpr="ms.collection('history').all()"/>
+          </List>
+
+        </Stack>
+      </Left>
+
+      <Right>
+        <Stack fill="true">
+
+          <Conditional showKey="history_selected">
+
+            <!-- THEN: history item selected -->
+            <Stack fill="true" gap="0">
+
+              <Inset padding="14 16 10">
+                <Stack direction="horizontal" gap="10" align="center">
+                  <Stack gap="2" style="flex: 1; min-width: 0;">
+                    <Text value="'@' + history_selected.username"                  style="subtitle"/>
+                    <Text value="'Level #' + to_string(history_selected.level_id)" style="muted"/>
+                  </Stack>
+                  <Badge value="history_selected.queue_type" variant="default"/>
+                </Stack>
+              </Inset>
+
+              <Tabs variant="boxed">
+                <Tab label="Level Info" icon="lucide:layers">
+                  <ScrollArea fill="true">
+                    <Stack gap="0">
+
+                      <Conditional showExpr="ms.get_or('gd_enabled', true)">
+
+                        <Stack gap="0">
+                          <Conditional showExpr="ms.get_or('gd_thumbnails', true)">
+                            <Image
+                              srcExpr="'https://levelthumbs.prevter.me/thumbnail/' + to_string(history_selected.level_id)"
+                              height="150"/>
+                          </Conditional>
+                          <Inset padding="12 16 6">
+                            <SectionHeader label="Level Details"/>
+                          </Inset>
+                          <DetailCard
+                            dataExpr="gd.fetch(to_string(history_selected.level_id))"
+                            placeholder="Loading level data…">
+                            <Field key="name"        label="Level Name"/>
+                            <Field key="difficulty"  label="Difficulty"  type="badge"/>
+                            <Field key="stars"       label="Stars"       type="stars"/>
+                            <Field key="downloads"   label="Downloads"   type="number"/>
+                            <Field key="likes"       label="Likes"       type="number"/>
+                            <Field key="length"      label="Length"/>
+                            <Field key="is_demon"    label="Demon"       type="boolean"/>
+                            <Field key="is_featured" label="Featured"    type="boolean"/>
+                            <Field key="is_epic"     label="Epic"        type="boolean"/>
+                          </DetailCard>
+                        </Stack>
+
+                        <Stack style="padding: 14px 16px;">
+                          <CalloutBox kind="note" title="GD Integration Disabled" message="Enable GD data in module settings to view level details."/>
+                        </Stack>
+
+                      </Conditional>
+
+                    </Stack>
+                  </ScrollArea>
+                </Tab>
+              </Tabs>
+
+            </Stack>
+
+            <!-- ELSE: nothing selected -->
+            <EmptyState icon="lucide:clock" message="Select a level from the history to view details."/>
+
+          </Conditional>
+
+        </Stack>
+      </Right>
+
+    </TwoColumn>
+  </SubPage>
+
+</Page>

@@ -1,8 +1,36 @@
 [
   {
+    "author": "GDLQBot Team",
+    "checksum": "9f31b3386b97c079445b7c681c5598ad8b300eeea4ec81be40c0ecf43b94b3ea",
+    "commands": [],
+    "description": "Standard utilities for RHAI Script Engine.",
+    "download_url": "",
+    "icon": "layers",
+    "id": "stdlib",
+    "libraries": [
+      "arr",
+      "str",
+      "math",
+      "fmt",
+      "io"
+    ],
+    "min_app_version": "0.1.0",
+    "modules": [],
+    "name": "Standard Library",
+    "package_type": "package",
+    "premium": false,
+    "pub_date": "2026-07-16T18:21:48Z",
+    "tags": [
+      "official",
+      "package"
+    ],
+    "verified": true,
+    "version": "1.0.0"
+  },
+  {
     "id": "level-queue",
     "name": "Level Queue",
-    "version": "2.0.0",
+    "version": "2.0.4",
     "min_app_version": "0.1.0",
     "author": "GDLQBot Team",
     "description": "Manage a Geometry Dash level request queue from your chat.",
@@ -129,36 +157,8 @@
     ],
     "libraries": [],
     "modules": [],
-    "checksum": "dec903f8bf59cc6544409ce323f3647e5581cbab4cacdb22de54f3581f687c57",
-    "pub_date": "2026-07-16T18:21:48Z",
-    "download_url": ""
-  },
-  {
-    "id": "stdlib",
-    "name": "Standard Library",
-    "version": "1.0.0",
-    "min_app_version": "0.1.0",
-    "author": "GDLQBot Team",
-    "description": "Standard utilities for RHAI Script Engine.",
-    "icon": "layers",
-    "package_type": "package",
-    "verified": true,
-    "premium": false,
-    "tags": [
-      "official",
-      "package"
-    ],
-    "commands": [],
-    "libraries": [
-      "arr",
-      "str",
-      "math",
-      "fmt",
-      "io"
-    ],
-    "modules": [],
-    "checksum": "9f31b3386b97c079445b7c681c5598ad8b300eeea4ec81be40c0ecf43b94b3ea",
-    "pub_date": "2026-07-16T18:21:48Z",
+    "checksum": "ec0b94436bc18b3201e588ed9e9466ea73106bd96de1cae0860c6332d998c96e",
+    "pub_date": "2026-07-18T04:11:45Z",
     "download_url": ""
   }
 ]

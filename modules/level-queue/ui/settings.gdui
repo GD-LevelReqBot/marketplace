@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Page id="settings" label="Settings" icon="settings">
+  <Tabs variant="underline">
+
+    <Tab label="Limits">
+      <Form submitKey="save_settings" title="Queue Limits">
+        <Input
+          key="max_size"
+          label="Max Queue Size"
+          type="number"
+          defaultExpr="ms.get_or('max_size', 25)"
+          placeholder="25"
+          min="1"
+          max="500"/>
+        <Input
+          key="viewer_limit"
+          label="Requests per Viewer"
+          type="number"
+          defaultExpr="ms.get_or('viewer_limit', 1)"
+          placeholder="1"
+          min="0"
+          max="100"/>
+        <Input
+          key="sub_limit"
+          label="Requests per Subscriber"
+          type="number"
+          defaultExpr="ms.get_or('sub_limit', 2)"
+          placeholder="2"
+          min="0"
+          max="100"/>
+      </Form>
+    </Tab>
+
+    <Tab label="Behavior">
+      <Form submitKey="save_settings" title="Queue Behavior">
+        <Toggle
+          key="sub_mode"
+          label="Subscriber Priority Mode"
+          defaultExpr="ms.get_or('sub_mode', false)"/>
+        <Toggle
+          key="open_on_startup"
+          label="Open Queue on Startup"
+          defaultExpr="ms.get_or('open_on_startup', true)"/>
+      </Form>
+    </Tab>
+
+    <Tab label="GD Integration">
+      <Form submitKey="save_settings" title="Geometry Dash">
+        <Toggle
+          key="gd_enabled"
+          label="Show GD Level Data"
+          defaultExpr="ms.get_or('gd_enabled', true)"/>
+        <Toggle
+          key="gd_thumbnails"
+          label="Show Level Thumbnails"
+          defaultExpr="ms.get_or('gd_thumbnails', true)"/>
+      </Form>
+    </Tab>
+
+  </Tabs>
+</Page>

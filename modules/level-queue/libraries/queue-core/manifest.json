@@ -1,0 +1,7 @@
+{
+  "id": "queue-core",
+  "name": "Queue Core",
+  "description": "Core queue operations library for the Level Queue module.",
+  "version": "1.0.0",
+  "entry": "queue_core.rhai"
+}

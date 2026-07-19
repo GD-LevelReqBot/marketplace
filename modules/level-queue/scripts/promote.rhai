@@ -1,47 +1,21 @@
-// !promote <level_id> — move a level to the front (staff only)
-let level_id_str = if args.len() > 0 { args[0] } else { "" };
-let level_id = parse_int(level_id_str);
+import "queue-core" as q;
 
+let level_id = if args.len() > 0 { parse_int(args[0]) } else { () };
 if level_id == () {
     chat.reply("Usage: !promote <level_id>");
     return;
 }
 
-let found          = ();
-let found_col_name = ();
-for col_name in ["viewer", "subscriber"] {
-    for e in ms.collection(col_name).all() {
-        if e.level_id == level_id {
-            found          = e;
-            found_col_name = col_name;
-            break;
-        }
-    }
-    if found != () { break; }
-}
-
+let found = q::find_by_level_id(level_id);
 if found == () {
     chat.say(`Level ${level_id} is not in the queue.`);
     return;
 }
-if found.position == 1 {
+if found.entry.position == 1 {
     chat.say(`Level ${level_id} is already at the front.`);
     return;
 }
 
-let col       = ms.collection(found_col_name);
-let remaining = col.all().filter(|e| e._id != found._id);
-col.clear();
-
-found.position = 1;
-col.push(found);
-
-let pos = 2;
-for e in remaining {
-    e.position = pos;
-    col.push(e);
-    pos += 1;
-}
-
+q::promote_entry(level_id);
 event.emit("queue-updated", ());
-chat.say(`Level ${level_id} has been promoted to the front of the ${found_col_name} queue.`);
+chat.say(`Level ${level_id} promoted to the front of the ${found.col_name} queue.`);

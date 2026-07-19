@@ -1,6 +1,8 @@
 # Creating GDLQBot Modules
 
-Modules let you add custom commands and UI panels to GD Level Request Bot. Each module is a self-contained package of Rhai scripts and a manifest file.
+Modules let you add custom commands, sidebar pages, and interactive UI to GD Level Request Bot. Each module is a self-contained package of Rhai scripts, declarative UI pages, and a manifest.
+
+**For the full UI system reference (pages, widgets, charts, forms, hot-reload), see [UI_SYSTEM.md](./UI_SYSTEM.md).**
 
 ## Quick Start
 
@@ -8,8 +10,10 @@ Modules let you add custom commands and UI panels to GD Level Request Bot. Each 
 modules/
 └── my-module/
     ├── manifest.json
-    └── scripts/
-        └── my_command.rhai
+    ├── scripts/
+    │   └── my_command.rhai
+    └── ui/
+        └── main.gdui         ← declarative sidebar page (optional)
 ```
 
 ## manifest.json Reference
@@ -48,25 +52,11 @@ modules/
   // Chat command triggers this module handles
   "commands": ["!mycmd", "!myothercmd"],
 
-  // UI panels shown when the module is selected in the app
-  "panels": [
-    {
-      "id": "main",
-      "label": "Main",
-      "widgets": [
-        {
-          "widget_type": "Table",
-          "columns": [
-            { "key": "username", "label": "User" },
-            { "key": "value",    "label": "Value" }
-          ],
-          "data_expr": "ms.collection(\"entries\").all()",
-          "actions": [
-            { "label": "Remove", "action_key": "remove_entry" }
-          ]
-        }
-      ]
-    }
+  // Sidebar pages — each points to a .gdui file in ui/
+  // See UI_SYSTEM.md for the full page authoring reference.
+  "pages": [
+    { "id": "main",     "label": "Main",     "icon": "list",     "file": "ui/main.gdui" },
+    { "id": "settings", "label": "Settings", "icon": "settings", "file": "ui/settings.gdui" }
   ],
 
   // Maps script key → relative path within this package
@@ -78,41 +68,20 @@ modules/
 }
 ```
 
-## Available Widget Types
+## UI Pages
 
-### `Table`
-Renders a data table with optional action buttons per row.
-```json
-{
-  "widget_type": "Table",
-  "columns": [{ "key": "field", "label": "Display" }],
-  "data_expr": "ms.collection(\"items\").all()",
-  "actions": [{ "label": "Remove", "action_key": "remove_item" }]
-}
-```
+Pages are XML files in the `ui/` folder. They define the full layout and interactive controls for each sidebar entry. The system supports:
 
-### `StatCard`
-Shows a single value in a large card.
-```json
-{
-  "widget_type": "StatCard",
-  "label": "Total Count",
-  "value_expr": "ms.get(\"count\") ?? 0"
-}
-```
+- **`<TwoColumn>`** and **`<Stack>`** — layout
+- **`<Tabs>`** — tabbed views with live count badges
+- **`<Toolbar>`** — open/close toggle, count badge, action buttons
+- **`<List>`** — scrollable data list with row selection and row actions
+- **`<DetailCard>`** — field grid driven by selection state
+- **`<Form>`** — editable settings with live defaults from module store
+- **`<StatCard>`** — single metric display (formatted number, percent, duration)
+- **`<Chart>`** — SVG bar or line chart, no external dependencies
 
-### `ModuleSettings`
-Renders a settings form where values are stored in the module's KV store.
-```json
-{
-  "widget_type": "ModuleSettings",
-  "fields": [
-    { "key": "max_items", "label": "Max Items", "type": "number", "default": 10 },
-    { "key": "enabled",   "label": "Enabled",   "type": "toggle", "default": true },
-    { "key": "prefix",    "label": "Prefix",     "type": "text",   "default": "!" }
-  ]
-}
-```
+See **[UI_SYSTEM.md](./UI_SYSTEM.md)** for the complete reference with examples.
 
 ## Writing Rhai Scripts
 

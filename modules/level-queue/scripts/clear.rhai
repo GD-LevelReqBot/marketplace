@@ -1,5 +1,5 @@
-// !clear — clear the entire queue (mod/broadcaster only)
-ms.collection("viewer").clear();
-ms.collection("subscriber").clear();
+import "queue-core" as q;
+
+q::clear_queue(false);
 event.emit("queue-updated", ());
 chat.say("The level queue has been cleared.");

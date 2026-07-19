@@ -1,4 +1,10 @@
-import "queue-core" as q;
+// @trigger !list
+// @alias
+// @description Show the current queue
+// @roles everyone
+// @platform all
+// @cooldown 5
+// @user_cooldown 0
 
 let page = if args.len() > 0 { parse_int(args[0]) } else { 1 };
 if page == () || page < 1 { page = 1; }

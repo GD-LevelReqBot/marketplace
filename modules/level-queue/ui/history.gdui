@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Page id="history" label="History" icon="list">
+
+  <!-- ── Main view: list of played levels ──────────────────────────────── -->
+  <Stack fill="true">
+    <Toolbar
+      countExpr="ms.collection('history').count()"
+      maxExpr="()">
+      <Action label="Clear History" key="clear_history" style="danger"/>
+    </Toolbar>
+
+    <List
+      rowId="level_id"
+      primary="level_id"
+      secondary="username"
+      platform="platform"
+      badgeField="queue_type"
+      selectionKey="history_selected"
+      navigateTo="detail"
+      emptyMessage="No levels have been played yet">
+      <Section dataExpr="ms.collection('history').all()"/>
+    </List>
+  </Stack>
+
+  <!-- ── Detail sub-page: level card for a selected history entry ───────── -->
+  <SubPage id="detail">
+    <Stack fill="true">
+
+      <Conditional showKey="history_selected">
+        <Stack gap="10">
+          <Stack direction="horizontal" gap="12">
+            <Stack gap="2">
+              <Text value="'@' + history_selected.username" style="subtitle"/>
+              <Text value="'Level ' + to_string(history_selected.level_id)" style="muted"/>
+            </Stack>
+            <Spacer/>
+            <Badge value="history_selected.queue_type" variant="default"/>
+          </Stack>
+          <Divider/>
+        </Stack>
+      </Conditional>
+
+      <DetailCard
+        dataExpr="gd.get_level(history_selected.level_id)"
+        placeholder="Loading level details…">
+        <Field key="level_name"  label="Level Name"/>
+        <Field key="difficulty"  label="Difficulty"  type="badge"/>
+        <Field key="stars"       label="Stars"       type="stars"/>
+        <Field key="downloads"   label="Downloads"   type="number"/>
+        <Field key="likes"       label="Likes"       type="number"/>
+        <Field key="length"      label="Length"/>
+        <Field key="version"     label="Version"/>
+        <Field key="description" label="Description"/>
+      </DetailCard>
+
+    </Stack>
+  </SubPage>
+
+</Page>

@@ -1,22 +1,11 @@
-// !shuffle — randomize the viewer queue (mod/broadcaster only)
-let col = ms.collection("viewer");
-let entries = col.all();
+import "queue-core" as q;
 
-if entries.len() < 2 {
-    chat.say("Not enough viewers in queue to shuffle.");
+let total = ms.collection("viewer").count() + ms.collection("subscriber").count();
+if total < 2 {
+    chat.say("Not enough levels in queue to shuffle.");
     return;
 }
 
-// Fisher-Yates shuffle on positions
-let shuffled = rand.shuffle(entries);
-col.clear();
-
-let pos = 1;
-for e in shuffled {
-    e.position = pos;
-    col.push(e);
-    pos += 1;
-}
-
+q::shuffle_queue();
 event.emit("queue-updated", ());
-chat.say("The viewer queue has been shuffled!");
+chat.say("The queue has been shuffled!");
