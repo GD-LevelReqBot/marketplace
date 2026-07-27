@@ -15,15 +15,32 @@
           <Text value="to_string(ms.collection('subscriber').count() + ms.collection('viewer').count()) + '/' + to_string(ms.get_or('max_size', 25))" style="muted"/>
           <Spacer/>
           <ActionMenu label="···" variant="ghost">
-            <Action label="Shuffle"   key="shuffle"/>
-            <Action label="Clear All" key="clear"         style="danger"/>
-            <Action label="History"   navigateTo="history"/>
+            <Action label="Shuffle"   key="shuffle" icon="shuffle"/>
+            <Action label="Clear All" key="clear"   icon="trash-2" style="danger"/>
+            <Action label="History"   navigateTo="history" icon="history"/>
           </ActionMenu>
         </Stack>
 
-        <!-- Primary action: full-width prominent next button -->
+        <!-- Primary action: full-width prominent next button.
+             afterStateKey/afterStateExpr pulls the just-popped level (the newest
+             history entry — .last(), NOT .first(), which is the oldest) straight
+             into the right-panel "selected" state, so it shows persistently in
+             Level Info instead of only a transient toast/overlay. -->
         <Inset padding="8 12">
-          <Button label="Next Level" icon="fast-forward" actionKey="next" variant="primary" fullWidth="true"/>
+          <Button label="Next Level" icon="fast-forward" actionKey="next" variant="primary" fullWidth="true"
+                  afterStateKey="selected" afterStateExpr="ms.collection('history').last()"/>
+        </Inset>
+
+        <!-- Add a level on someone's behalf (verbal/Discord/etc requests). No
+             live chat message backs this, so subscriber status can't come
+             from a badge — add_level.rhai resolves it via a live Helix
+             check (twitch.is_subscriber) instead of guessing "viewer".
+             TwoFieldForm submits both fields as one JSON arg and manages its
+             own local state — see parser.ts for why that replaced a plain
+             Input+Input+Button row. -->
+        <Inset padding="0 12 8">
+          <TwoFieldForm actionKey="add_level" field1Key="level_id" field1Placeholder="Level ID"
+                        field2Key="username" field2Placeholder="Username" buttonLabel="Add" buttonIcon="plus"/>
         </Inset>
 
         <!-- Inline stats row -->
@@ -35,7 +52,13 @@
 
         <!-- Queue tabs (switching clears right-panel selection) -->
         <Tabs selectionKey="selected" variant="boxed">
-          <Tab label="Subscribers" icon="lucide:crown" badgeExpr="ms.collection('subscriber').count()">
+
+          <!-- Subscriber Priority Mode off (the default) — splitting into two tabs
+               is pointless (viewer/subscriber only affects which collection an
+               entry lands in when the priority split is actually active; with it
+               off, everyone lands in "viewer" regardless of real sub status), so
+               show one unified list instead. sub_badge still marks genuine subs. -->
+          <Tab label="Queue" icon="lucide:list" showExpr="!ms.get_or('sub_mode', false)">
             <List
               rowId="_id"
               primary="username"
@@ -43,14 +66,16 @@
               secondaryPrefix="#"
               platform="platform"
               positionField="position"
+              badgeField="sub_badge"
               selectionKey="selected"
-              emptyMessage="No subscriber requests yet">
-              <Section dataExpr="ms.collection('subscriber').all()"/>
-              <RowAction label="Promote" key="promote" argField="level_id"/>
-              <RowAction label="Remove"  key="remove"  argField="level_id" style="danger"/>
+              emptyMessage="No requests yet">
+              <Section dataExpr="(ms.collection('viewer').all() + ms.collection('subscriber').all()).map(|e| { e.sub_badge = if e.is_subscriber { 'SUB' } else { '' }; e })"/>
+              <RowAction key="promote" argField="level_id" icon="arrow-up"/>
+              <RowAction key="remove"  argField="level_id" style="danger" icon="trash-2"/>
             </List>
           </Tab>
-          <Tab label="Viewers" icon="lucide:users" badgeExpr="ms.collection('viewer').count()">
+
+          <Tab label="Subscribers" icon="lucide:crown" badgeExpr="ms.collection('subscriber').count()" showExpr="ms.get_or('sub_mode', false)">
             <List
               rowId="_id"
               primary="username"
@@ -58,11 +83,31 @@
               secondaryPrefix="#"
               platform="platform"
               positionField="position"
+              badgeField="sub_badge"
+              selectionKey="selected"
+              emptyMessage="No subscriber requests yet">
+              <Section dataExpr="ms.collection('subscriber').all().map(|e| { e.sub_badge = if e.is_subscriber { 'SUB' } else { '' }; e })"/>
+              <RowAction key="promote" argField="level_id" icon="arrow-up"/>
+              <RowAction key="remove"  argField="level_id" style="danger" icon="trash-2"/>
+            </List>
+          </Tab>
+          <Tab label="Viewers" icon="lucide:users" badgeExpr="ms.collection('viewer').count()" showExpr="ms.get_or('sub_mode', false)">
+            <List
+              rowId="_id"
+              primary="username"
+              secondary="level_id"
+              secondaryPrefix="#"
+              platform="platform"
+              positionField="position"
+              badgeField="sub_badge"
               selectionKey="selected"
               emptyMessage="No viewer requests yet">
-              <Section dataExpr="ms.collection('viewer').all()"/>
-              <RowAction label="Promote" key="promote" argField="level_id"/>
-              <RowAction label="Remove"  key="remove"  argField="level_id" style="danger"/>
+              <!-- sub_badge shows a SUB pill even here: this tab is "the viewer
+                   collection", not "definitely not a subscriber" — someone lands
+                   here whenever Subscriber Priority Mode is off, subscriber or not. -->
+              <Section dataExpr="ms.collection('viewer').all().map(|e| { e.sub_badge = if e.is_subscriber { 'SUB' } else { '' }; e })"/>
+              <RowAction label="Promote" key="promote" argField="level_id" icon="arrow-up"/>
+              <RowAction label="Remove"  key="remove"  argField="level_id" style="danger" icon="trash-2"/>
             </List>
           </Tab>
         </Tabs>
@@ -86,7 +131,7 @@
                   <Text value="'@' + selected.username"              style="subtitle"/>
                   <Text value="'Level #' + to_string(selected.level_id)" style="muted"/>
                 </Stack>
-                <Badge value="'#' + to_string(selected.position)" variant="accent"/>
+                <Badge value="if selected.position != () { '#' + to_string(selected.position) } else { 'Just played' }" variant="accent"/>
               </Stack>
             </Inset>
 
@@ -94,10 +139,29 @@
             <Tabs variant="boxed">
 
               <Tab label="Actions" icon="lucide:zap">
-                <Stack gap="8" style="padding: 14px 16px; flex-shrink: 0;">
-                  <Button label="Promote to Top"      icon="arrow-up"  actionKey="promote" argState="selected.level_id" variant="ghost"  fullWidth="true"/>
-                  <Button label="Remove from Queue"   icon="trash-2"   actionKey="remove"  argState="selected.level_id" variant="danger" fullWidth="true"/>
-                </Stack>
+                <!-- Queue entries have a `position`; a just-nexted level (shown via
+                     history) doesn't — it's already out of the queue, so Promote/
+                     Remove don't apply to it. -->
+                <Conditional showExpr="selected.position != ()">
+                  <Stack gap="8" style="padding: 14px 16px; flex-shrink: 0;">
+                    <!-- Grid, not a horizontal Stack: a fullWidth Button sets width:100%
+                         on itself, which in a plain flex row makes EACH button claim the
+                         whole row (and refuse to shrink), overflowing it. Grid's 1fr
+                         columns actually constrain each button's available width. -->
+                    <Grid columns="2" gap="8">
+                      <Button label="Move Up"   icon="chevron-up"   actionKey="move_up"   argState="selected.level_id" variant="ghost" fullWidth="true"/>
+                      <Button label="Move Down" icon="chevron-down" actionKey="move_down" argState="selected.level_id" variant="ghost" fullWidth="true"/>
+                    </Grid>
+                    <Button label="Promote to Top"      icon="arrow-up"  actionKey="promote" argState="selected.level_id" variant="ghost"  fullWidth="true"/>
+                    <Button label="Remove from Queue"   icon="trash-2"   actionKey="remove"  argState="selected.level_id" variant="danger" fullWidth="true"/>
+                    <Divider/>
+                    <Button label="Blacklist This Level" icon="ban"    actionKey="add_blacklist_level" argState="selected.level_id" variant="danger" fullWidth="true"/>
+                    <Button label="Blacklist Requester"  icon="user-x" actionKey="add_blacklist_user"  argState="selected.username"  variant="danger" fullWidth="true"/>
+                  </Stack>
+                  <Stack style="padding: 14px 16px;">
+                    <CalloutBox kind="note" title="Already played" message="This level has already been popped from the queue — check History for past requests."/>
+                  </Stack>
+                </Conditional>
               </Tab>
 
               <Tab label="Level Info" icon="lucide:layers">
@@ -168,7 +232,7 @@
             <Text value="to_string(ms.collection('history').count()) + ' played'" style="muted"/>
             <Spacer/>
             <ActionMenu label="···" variant="ghost">
-              <Action label="Clear History" key="clear_history" style="danger"/>
+              <Action label="Clear History" key="clear_history" icon="trash-2" style="danger"/>
             </ActionMenu>
             <Button label="Back" icon="arrow-left" navigateTo=".."/>
           </Stack>

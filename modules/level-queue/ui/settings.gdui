@@ -2,7 +2,7 @@
 <Page id="settings" label="Settings" icon="settings">
   <Tabs variant="underline">
 
-    <Tab label="Limits">
+    <Tab label="Limits" icon="lucide:sliders-horizontal">
       <Form submitKey="save_settings" title="Queue Limits">
         <Input
           key="max_size"
@@ -31,7 +31,7 @@
       </Form>
     </Tab>
 
-    <Tab label="Behavior">
+    <Tab label="Behavior" icon="lucide:settings-2">
       <Form submitKey="save_settings" title="Queue Behavior">
         <Toggle
           key="sub_mode"
@@ -44,7 +44,7 @@
       </Form>
     </Tab>
 
-    <Tab label="GD Integration">
+    <Tab label="Integrations" icon="lucide:puzzle">
       <Form submitKey="save_settings" title="Geometry Dash">
         <Toggle
           key="gd_enabled"
@@ -54,6 +54,109 @@
           key="gd_thumbnails"
           label="Show Level Thumbnails"
           defaultExpr="ms.get_or('gd_thumbnails', true)"/>
+      </Form>
+    </Tab>
+
+    <!-- One tab, three inner tabs — same ms.collection("blacklist") data, filtered
+         by `kind`, so this doesn't cost 3 top-level tabs for what's really one
+         feature with three lists. Chat command `!blacklist add|remove|list
+         level|author|user <value>` still works on the same data. -->
+    <Tab label="Blacklist" icon="lucide:ban">
+      <Tabs variant="pills">
+
+        <Tab label="Levels" icon="lucide:hash">
+          <Stack fill="true" gap="0">
+            <Stack direction="horizontal" gap="8" align="center" style="padding: 8px 16px; border-bottom: 1px solid #161616; flex-shrink: 0;">
+              <Text value="to_string(ms.collection('blacklist').all().filter(|e| e.kind == 'level').len()) + ' blacklisted'" style="muted"/>
+            </Stack>
+            <Inset padding="10 16 8">
+              <Stack direction="horizontal" gap="8" align="center">
+                <Input stateKey="new_bl_level" placeholder="Level ID" actionKey="add_blacklist_level"
+                       afterStateKey="new_bl_level" afterStateExpr="''"/>
+                <Button label="Add" icon="plus" actionKey="add_blacklist_level" argState="new_bl_level"
+                        afterStateKey="new_bl_level" afterStateExpr="''"/>
+              </Stack>
+            </Inset>
+            <List rowId="_id" primary="value" selectionKey="bl_level_selected" emptyMessage="No levels blacklisted">
+              <Section dataExpr="ms.collection('blacklist').all().filter(|e| e.kind == 'level')"/>
+              <RowAction label="Remove" key="remove_blacklist_entry" argField="_id" style="danger" icon="trash-2"/>
+            </List>
+          </Stack>
+        </Tab>
+
+        <Tab label="Authors" icon="lucide:user-x">
+          <Stack fill="true" gap="0">
+            <Stack direction="horizontal" gap="8" align="center" style="padding: 8px 16px; border-bottom: 1px solid #161616; flex-shrink: 0;">
+              <Text value="to_string(ms.collection('blacklist').all().filter(|e| e.kind == 'author').len()) + ' blacklisted'" style="muted"/>
+            </Stack>
+            <Inset padding="10 16 8">
+              <Stack direction="horizontal" gap="8" align="center">
+                <Input stateKey="new_bl_author" placeholder="Creator username" actionKey="add_blacklist_author"
+                       afterStateKey="new_bl_author" afterStateExpr="''"/>
+                <Button label="Add" icon="plus" actionKey="add_blacklist_author" argState="new_bl_author"
+                        afterStateKey="new_bl_author" afterStateExpr="''"/>
+              </Stack>
+            </Inset>
+            <List rowId="_id" primary="value" selectionKey="bl_author_selected" emptyMessage="No creators blacklisted">
+              <Section dataExpr="ms.collection('blacklist').all().filter(|e| e.kind == 'author')"/>
+              <RowAction label="Remove" key="remove_blacklist_entry" argField="_id" style="danger" icon="trash-2"/>
+            </List>
+          </Stack>
+        </Tab>
+
+        <Tab label="Requesters" icon="lucide:users">
+          <Stack fill="true" gap="0">
+            <Stack direction="horizontal" gap="8" align="center" style="padding: 8px 16px; border-bottom: 1px solid #161616; flex-shrink: 0;">
+              <Text value="to_string(ms.collection('blacklist').all().filter(|e| e.kind == 'user').len()) + ' blacklisted'" style="muted"/>
+            </Stack>
+            <Inset padding="10 16 8">
+              <Stack direction="horizontal" gap="8" align="center">
+                <Input stateKey="new_bl_user" placeholder="Requester username" actionKey="add_blacklist_user"
+                       afterStateKey="new_bl_user" afterStateExpr="''"/>
+                <Button label="Add" icon="plus" actionKey="add_blacklist_user" argState="new_bl_user"
+                        afterStateKey="new_bl_user" afterStateExpr="''"/>
+              </Stack>
+            </Inset>
+            <List rowId="_id" primary="value" selectionKey="bl_user_selected" emptyMessage="No requesters blacklisted">
+              <Section dataExpr="ms.collection('blacklist').all().filter(|e| e.kind == 'user')"/>
+              <RowAction label="Remove" key="remove_blacklist_entry" argField="_id" style="danger" icon="trash-2"/>
+            </List>
+          </Stack>
+        </Tab>
+
+      </Tabs>
+    </Tab>
+
+    <!-- Every filter here reads GD level data (difficulty/length/likes/author), so the
+         whole tab is pointless without GD Integration on — hide it rather than let
+         someone configure filters that silently never get enforced. -->
+    <!-- One <Form> — NOT several stacked in a ScrollArea. Each <Form>'s own root
+         has `flex: 1`, meant to fill its container when it's the sole content of a
+         tab; several of them side by side inside a ScrollArea compete for that same
+         `flex: 1` against each other instead of stacking at their natural height,
+         which is what silently broke this tab's scrolling. `group=` on each Toggle
+         gets the visual sectioning back without splitting the Form. -->
+    <Tab label="Filters" icon="lucide:filter" showExpr="ms.get_or('gd_enabled', true)">
+      <Form submitKey="save_settings">
+        <Toggle key="no_disliked_levels" label="Block disliked levels" group="General" defaultExpr="ms.get_or('no_disliked_levels', false)"/>
+        <Toggle key="diff_unrated" label="Unrated"          group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_unrated', true)"/>
+        <Toggle key="diff_auto"    label="Auto"             group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_auto', true)"/>
+        <Toggle key="diff_easy"    label="Easy"             group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_easy', true)"/>
+        <Toggle key="diff_normal"  label="Normal"           group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_normal', true)"/>
+        <Toggle key="diff_hard"    label="Hard"             group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_hard', true)"/>
+        <Toggle key="diff_harder"  label="Harder"           group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_harder', true)"/>
+        <Toggle key="diff_insane"  label="Insane"           group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_insane', true)"/>
+        <Toggle key="diff_demon_easy"    label="Easy Demon"    group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_demon_easy', true)"/>
+        <Toggle key="diff_demon_medium"  label="Medium Demon"  group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_demon_medium', true)"/>
+        <Toggle key="diff_demon_hard"    label="Hard Demon"    group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_demon_hard', true)"/>
+        <Toggle key="diff_demon_insane"  label="Insane Demon"  group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_demon_insane', true)"/>
+        <Toggle key="diff_demon_extreme" label="Extreme Demon" group="Difficulty — checked = allowed" defaultExpr="ms.get_or('diff_demon_extreme', true)"/>
+        <Toggle key="len_tiny"       label="Tiny"       group="Length — checked = allowed" defaultExpr="ms.get_or('len_tiny', true)"/>
+        <Toggle key="len_short"      label="Short"      group="Length — checked = allowed" defaultExpr="ms.get_or('len_short', true)"/>
+        <Toggle key="len_medium"     label="Medium"     group="Length — checked = allowed" defaultExpr="ms.get_or('len_medium', true)"/>
+        <Toggle key="len_long"       label="Long"       group="Length — checked = allowed" defaultExpr="ms.get_or('len_long', true)"/>
+        <Toggle key="len_xl"         label="XL"         group="Length — checked = allowed" defaultExpr="ms.get_or('len_xl', true)"/>
+        <Toggle key="len_platformer" label="Platformer" group="Length — checked = allowed" defaultExpr="ms.get_or('len_platformer', true)"/>
       </Form>
     </Tab>
 

@@ -12,4 +12,4 @@ if ms.get("open") == true {
 }
 ms.set("open", true);
 event.emit("queue-updated", ());
-chat.say("The queue is now open! Use !r <level_id> to request a level.");
+chat.announce("The queue is now open! Use !r <level_id> to request a level.", "green");

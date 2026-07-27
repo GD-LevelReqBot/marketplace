@@ -82,6 +82,68 @@ def git_changed_since(tag: str) -> set[str]:
 MODULE_REQUIRED  = ["id", "name", "version", "min_app_version", "description", "scripts"]
 PACKAGE_REQUIRED = ["id", "name", "version", "author", "description", "package_type"]
 
+# ── Rhai lint ─────────────────────────────────────────────────────────────────
+# Rhai string/array methods that mutate their receiver IN PLACE and return ()
+# — unlike their JS-namesake equivalents. `let x = s.trim();` silently binds
+# x = () while s itself ends up trimmed; the bug is invisible until whatever
+# consumes x hits a "()" it didn't expect, often lines (or scripts) away from
+# the actual mistake. Confirmed the hard way: an entire debugging session was
+# spent chasing a "" isn't a valid level ID" runtime error back to exactly
+# this pattern in a UI action script, written straight to a .rhai file outside
+# the desktop app's editor (so its own in-editor lint never saw it). This is
+# the repo-wide backstop — catches it regardless of how the script was edited.
+#
+# Deliberately excludes push/remove/clear/insert/shuffle — the desktop app
+# registers custom Rust functions with those exact names on several proxies
+# (ms.collection().push/.remove/.clear, queue.remove/.clear/.shuffle,
+# data.insert/.clear, rand.shuffle) that DO return meaningful values, and are
+# routinely used in `let x = proxy.method(...)` form. Flagging those would be
+# false positives, not real bugs — see desktop/src-tauri/src/scripting/proxy/.
+RHAI_INPLACE_MUTATORS = [
+    "trim", "crop", "pad", "truncate", "push_str", "append",
+    "drain", "retain", "splice", "fill_with",
+    "make_lower", "make_upper", "sort", "reverse", "dedup", "swap",
+]
+_MUTATOR_NAMES = "|".join(RHAI_INPLACE_MUTATORS)
+# Case 1: `<lvalue> = <anything>.trim(...);` at the END of a statement — not
+# just `let x = s.trim()`, but also `result[k] = parts.join("=").trim();`
+# (index/field assignment, receiver itself a call chain, etc). Anchored to
+# `=` (excluding ==/!=/<=/>=) and to end-of-line so it finds the outermost
+# trailing call regardless of how complex the receiver expression is.
+_MUTATOR_ASSIGN_RE = re.compile(
+    r"[^=!<>]=(?!=)\s*.+\.(" + _MUTATOR_NAMES + r")\s*\([^()]*\)\s*;?\s*$",
+)
+# Case 2: `<expr>.trim(...).<anything>` — chains off the () return value,
+# anywhere in a line (assigned, returned, or used bare in an expression like
+# `if s.trim().len() == 0`). This one's arguably worse: it doesn't just lose
+# data, it throws "Function not found" the moment the script runs.
+_MUTATOR_CHAIN_RE = re.compile(
+    r"\.(" + _MUTATOR_NAMES + r")\s*\([^()]*\)\s*\.",
+)
+
+def lint_rhai_file(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    errors = []
+    for i, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+        if line.strip().startswith("//"):
+            continue
+        m = _MUTATOR_ASSIGN_RE.search(line)
+        if m:
+            errors.append(
+                f'{path.name}:{i}: `.{m.group(1)}()` mutates in place and returns () in Rhai — '
+                f"this assigns () instead of the result. Call it as its own statement, "
+                f"then use the variable on the next line."
+            )
+        for m in _MUTATOR_CHAIN_RE.finditer(line):
+            errors.append(
+                f'{path.name}:{i}: `.{m.group(1)}()` mutates in place and returns () in Rhai — '
+                f"chaining another call onto it (`.{m.group(1)}()....`) calls that method on (), "
+                f"which throws at runtime. Call `.{m.group(1)}()` as its own statement first."
+            )
+    return errors
+
+
 def validate_semver(v: str, field: str) -> list[str]:
     parts = v.split(".")
     if len(parts) != 3 or not all(p.isdigit() for p in parts):
@@ -105,8 +167,11 @@ def validate_module(pkg_dir: Path) -> tuple[dict, list[str]]:
         if field in m: errors.extend(validate_semver(m[field], field))
     if "scripts" in m:
         for key, rel_path in m["scripts"].items():
-            if not (pkg_dir / rel_path).exists():
+            script_path = pkg_dir / rel_path
+            if not script_path.exists():
                 errors.append(f'Script "{key}" -> "{rel_path}" not found')
+            else:
+                errors.extend(lint_rhai_file(script_path))
     for page in m.get("pages", []):
         page_file = page.get("file", "")
         if not page_file:
@@ -117,8 +182,12 @@ def validate_module(pkg_dir: Path) -> tuple[dict, list[str]]:
         errors.append(f'settings_page "{m["settings_page"]}" not found')
     for lib_def in m.get("bundle", {}).get("libraries", []):
         lib_file = lib_def.get("file", "")
-        if lib_file and not (pkg_dir / lib_file).exists():
-            errors.append(f'Bundled library "{lib_def.get("name", "?")}" -> "{lib_file}" not found')
+        if lib_file:
+            lib_path = pkg_dir / lib_file
+            if not lib_path.exists():
+                errors.append(f'Bundled library "{lib_def.get("name", "?")}" -> "{lib_file}" not found')
+            else:
+                errors.extend(lint_rhai_file(lib_path))
     return m, errors
 
 def validate_bundle(pkg_dir: Path) -> tuple[dict, list[str]]:
@@ -139,6 +208,9 @@ def validate_bundle(pkg_dir: Path) -> tuple[dict, list[str]]:
         lib_dir = pkg_dir / "libraries" / lib_id
         if not lib_dir.is_dir() or not (lib_dir / "manifest.json").exists():
             errors.append(f'Library "{lib_id}" not found at {lib_dir.relative_to(ROOT)}')
+        else:
+            for rhai_file in sorted(lib_dir.glob("*.rhai")):
+                errors.extend(lint_rhai_file(rhai_file))
     for mod_id in m.get("modules", []):
         mod_dir = MODULES / mod_id
         if not mod_dir.is_dir() or not (mod_dir / "manifest.json").exists():

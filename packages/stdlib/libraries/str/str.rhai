@@ -1,10 +1,12 @@
 // str.rhai — string utilities
 
 fn words(s) {
-    let parts = s.trim().split(" ");
+    let text = s;
+    text.trim();
+    let parts = text.split(" ");
     let out = [];
     for p in parts {
-        let p = p.trim();
+        p.trim();
         if p != "" { out.push(p); }
     }
     out
@@ -94,7 +96,9 @@ fn indent(s, prefix) {
 }
 
 fn is_blank(s) {
-    s.trim().len() == 0
+    let text = s;
+    text.trim();
+    text.len() == 0
 }
 
 fn between(s, open, close) {

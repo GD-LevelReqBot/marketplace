@@ -52,11 +52,14 @@ fn kv_parse(s, sep) {
     for part in s.split(sep) {
         let kv = part.split("=");
         if kv.len() < 2 { continue; }
-        let k = kv[0].trim();
+        let k = kv[0];
+        k.trim();
         if k == "" { continue; }
         let val_parts = []; let i = 1;
         while i < kv.len() { val_parts.push(kv[i]); i += 1; }
-        result[k] = val_parts.join("=").trim();
+        let v = val_parts.join("=");
+        v.trim();
+        result[k] = v;
     }
     result
 }
@@ -68,7 +71,7 @@ fn query_parse(s) { kv_parse(s, "&") }
 fn split_trim(s, sep) {
     let out = [];
     for p in s.split(sep) {
-        let p = p.trim();
+        p.trim();
         if p != "" { out.push(p); }
     }
     out
@@ -84,7 +87,8 @@ fn kv_encode(map, sep) {
 /// Return the first non-empty string from a list of candidates.
 fn coalesce(candidates) {
     for c in candidates {
-        let s = `${c}`.trim();
+        let s = `${c}`;
+        s.trim();
         if s != "" { return s; }
     }
     ""

@@ -80,6 +80,7 @@ Pages are XML files in the `ui/` folder. They define the full layout and interac
 - **`<Form>`** — editable settings with live defaults from module store
 - **`<StatCard>`** — single metric display (formatted number, percent, duration)
 - **`<Chart>`** — SVG bar or line chart, no external dependencies
+- **`<Import file="…">`** — splice in another `.gdui` file, for breaking large pages into smaller reusable files
 
 See **[UI_SYSTEM.md](./UI_SYSTEM.md)** for the complete reference with examples.
 
@@ -100,15 +101,16 @@ ms.has("key");
 ms.delete("key");
 ms.incr("counter");
 
-// Collections (lists of JSON objects)
+// Collections (lists of JSON objects, insertion-ordered — oldest first)
 let col = ms.collection("items");
 col.push(#{ field: "value" });     // returns doc_id
-let all = col.all();               // Vec of objects
-let first = col.first();
+let all = col.all();               // Vec of objects, oldest first
+let first = col.first();           // oldest entry
+let last = col.last();             // most recently pushed entry — NOT the same as first()
 let n = col.count();
 col.remove(doc._id);
 col.clear();
-let found = col.find(10);          // first 10 items
+let found = col.find(10);          // first 10 items (oldest)
 ```
 
 ### `chat` — Send Messages
@@ -116,16 +118,106 @@ let found = col.find(10);          // first 10 items
 ```rhai
 chat.say("Hello, chat!");
 chat.reply("Replying to the user who triggered this command");
+chat.announce("Big news!");            // highlighted announcement on Twitch, plain say() elsewhere
+chat.announce("Big news!", "purple");  // color: primary|blue|green|orange|purple
+```
+
+`announce()` posts a Twitch Helix chat announcement (the highlighted colored message type) when the command was triggered on Twitch and the bot's token has the announcement scope. It transparently falls back to a plain `say()` on YouTube, or on Twitch if Helix isn't available yet (e.g. the user hasn't reconnected since this scope was added) — it never errors your script.
+
+### `twitch` — Twitch Helix API
+
+General-purpose Twitch API access, available in every script (not just Twitch-triggered ones — check `is_connected()` first). Degrades gracefully to `()` / `false` when the bot isn't connected to Twitch.
+
+```rhai
+if twitch.is_connected() {
+    let u = twitch.get_user("someviewer");   // #{ id, login, display_name } or ()
+    if u != () {
+        chat.say(u.display_name + "'s user ID is " + u.id);
+    }
+    twitch.announce("Hello from a script!");            // same as chat.announce(), color optional
+    twitch.announce("Hello!", "green");
+
+    // Channel-point rewards. Requires channel:manage:redemptions — the auth
+    // service already requests it, so this just needs a reconnect on tokens
+    // issued before that scope existed.
+    let rewards = twitch.list_rewards();   // [ #{id, title, cost, prompt, is_enabled}, ... ]
+    let r = twitch.create_reward("Skip the line", 500);   // or create_reward(title, cost, prompt)
+}
+```
+
+#### Subscriber status
+
+`user.isSub()` is the fast path and is already correct for real chat messages —
+Twitch sends a fresh badge tag on every PRIVMSG, so there's no staleness to
+worry about there. It only falls short when a script runs *without* a real
+chat message behind it — a module UI action (`execute_module_action`), or a
+command fired by an "Internal event" listener — where there's no badge to
+read and `user.isSub()` always reports `false`. For those, `twitch.is_subscriber(login)`
+does a live Helix lookup instead:
+
+```rhai
+if user.platform == "twitch" && !user.isSub() && twitch.is_subscriber(user.name) {
+    // only reachable from a non-chat invocation, e.g. redeemed via a UI button
+}
+```
+
+There's no YouTube equivalent — channel membership lookups by user require the
+`youtube.channel-memberships.creator` OAuth scope, which isn't currently
+requested (it's a more sensitive scope than what's granted today). The only
+membership signal available is the same chat-message-time one `user.isSub()`
+already uses (`isChatSponsor` on the live chat message) — accurate for real
+chat, unavailable for non-chat invocations, with no live-lookup fallback.
+
+#### Reacting to redemptions
+
+Redemptions aren't polled — they arrive in real time over EventSub. To react to
+one, declare `"redemption_handler": "<script_key>"` in your manifest (top
+level, next to `"settings_page"`). That script runs for **every** channel-point
+redemption on the channel, not just ones you created — most won't be yours, so
+check and bail out immediately:
+
+```rhai
+// args: [reward_title, user_login, user_input, redemption_id, reward_id, reward_cost]
+if args[0].to_lower() != "skip the line" { return; }
+
+// It's ours — do the thing, then resolve the redemption one way or the other.
+// Neither call is automatic; Twitch leaves it "unfulfilled" until you do.
+twitch.complete_redemption(args[3], args[4]);   // accept
+// twitch.cancel_redemption(args[3], args[4]);  // refund the viewer's points instead
+```
+
+There's no manifest-level binding from a reward to a title — reward titles are
+something the streamer sets up themselves in the Twitch dashboard (this API
+can't be handed a fixed reward ID at install time), so the matching has to
+happen in the script, typically against an `ms`-stored setting the user
+configures in your module's settings page rather than a hardcoded string like
+the example above.
+
+### `youtube` — YouTube Data API
+
+Small by design — YouTube's chat API surface doesn't have an announcement or channel-points equivalent for the bot to trigger.
+
+```rhai
+if youtube.is_connected() {
+    let ch = youtube.get_channel();   // #{ id, title } or ()
+}
 ```
 
 ### `user` — Command Invoker Info
 
 ```rhai
-let name      = user.name();          // username (string)
+let name      = user.name;            // username (string, property — no parens)
+let platform  = user.platform;        // "twitch" | "youtube"
 let is_mod    = user.isMod();         // bool
 let is_sub    = user.isSub();         // bool
 let is_bc     = user.isBroadcaster(); // bool
-let arg_list  = user.args();          // Vec<String> of command arguments
+let is_staff  = user.isStaff();       // bool — mod OR broadcaster
+```
+
+Command arguments are `args` — a top-level array, not a method on `user`:
+```rhai
+let first    = args[0];
+let arg_count = args.len();
 ```
 
 ### `event` — Emit Frontend Events
@@ -133,6 +225,22 @@ let arg_list  = user.args();          // Vec<String> of command arguments
 ```rhai
 event.emit("queue-updated", ());
 event.emit("my-event", #{ key: "value" });
+```
+
+`emit()` does three things: pushes to the frontend/WebSocket (as before), and also fires any command whose "Internal event" listener is bound to that name — either the bare name, or the module-namespaced form (`<author-slug>.<module-id>.<name>`, e.g. `gdlqbot-team.level-queue.next-level`), which is what shows up in the listener picker. Declare events your module emits in the manifest's `events` array (`key`, `label`, `description`) so they actually show up there instead of requiring users to know/type the exact name.
+
+`emit()` refuses to dispatch a name that's already earlier in the current dispatch chain (a listener command's script re-emitting the event that triggered it, directly or via other events) — logged as a cycle, not a silent no-op, so it's visible in the dev console if it happens.
+
+```rhai
+// Was this event emitted in the last 5 seconds (or a custom window)? Useful
+// when the same script can be reached two independent ways (a chat command
+// and a UI button both running it) and you want the second one to not repeat
+// whatever the first one already did:
+if event.emitted("level-nexted", 5) {
+    // already advanced moments ago — restate it instead of doing it again
+} else {
+    // do the thing, then event.emit("level-nexted", ...)
+}
 ```
 
 ### `time` — Timestamps
@@ -170,6 +278,7 @@ The `min_app_version` field prevents your module from being installed on an olde
 
 **Rule of thumb:**
 - If you only use `ms`, `chat`, `user`, `event`, `time`, `rand`, `io` — use `"min_app_version": "0.1.0"`
+- `twitch`, `youtube`, and `chat.announce()` are newer additions — bump `min_app_version` accordingly once this app version ships, so older installs get a clear "update the app" message instead of a missing-variable script error
 - New scripting APIs added in future app versions will be documented with their required minimum version
 
 The app checks `min_app_version` using semantic versioning: `app_version >= min_app_version`.
@@ -185,6 +294,32 @@ zip -r my-module.gdmod manifest.json scripts/
 ```
 
 Then install it in the app via **Modules → Install from file**.
+
+## Locking Part of a Script
+
+Users can save a per-command script override from Settings → Commands (it's
+how they customize a builtin command's behavior). If some of your script is
+load-bearing enough that an edit there would break in a confusing way — not
+"wrong output," but "the queue page stops working" — wrap just that part in
+`// @lock` / `// @unlock`:
+
+```rhai
+// @lock
+let entry = q::pop_next(ms, rand, time);
+if entry == () { chat.say("The queue is empty!"); return; }
+event.emit("queue-updated", ());
+// @unlock
+chat.announce(`Next level: ${entry.level_id}`);  // this line stays fully editable
+```
+
+This is content-based, not position-based: everything *outside* a locked
+block is freely editable (including reordering code around it), but the
+locked block itself must survive verbatim into a saved override or the save
+is rejected — both in the editor (before the round-trip) and server-side (the
+part that actually matters, in case the frontend check is ever bypassed).
+There's no whole-script lock — if a command has no lockable parts, don't add
+the markers; users can already customize the whole thing today, that's the
+point of the override mechanism.
 
 ## Script Key Convention
 

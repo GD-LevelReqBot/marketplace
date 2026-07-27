@@ -12,4 +12,4 @@ if ms.get("open") == false {
 }
 ms.set("open", false);
 event.emit("queue-updated", ());
-chat.say("The queue is now closed. No new requests will be accepted.");
+chat.announce("The queue is now closed. No new requests will be accepted.", "orange");
