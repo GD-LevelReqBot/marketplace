@@ -28,137 +28,156 @@
     "version": "1.0.0"
   },
   {
-    "id": "level-queue",
-    "name": "Level Queue",
-    "version": "2.0.4",
-    "min_app_version": "0.1.0",
     "author": "GDLQBot Team",
+    "checksum": "f2ea9d5aca0ba7ea7ce5a650a0f3f52940c8c5823d65734025ed8c687f93036c",
+    "commands": [
+      {
+        "aliases": [
+          "!request"
+        ],
+        "builtin_key": "request",
+        "description": "Add a level to the queue",
+        "enabled": true,
+        "required_badges": [],
+        "trigger": "!r"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "next",
+        "description": "Pop the next level from the queue",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!next"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "list",
+        "description": "Show the current queue",
+        "enabled": true,
+        "required_badges": [],
+        "trigger": "!list"
+      },
+      {
+        "aliases": [
+          "!position"
+        ],
+        "builtin_key": "position",
+        "description": "Get your position in the queue",
+        "enabled": true,
+        "required_badges": [],
+        "trigger": "!pos"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "remove",
+        "description": "Remove a level from the queue",
+        "enabled": true,
+        "required_badges": [],
+        "trigger": "!remove"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "clear",
+        "description": "Clear the entire queue",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!clear"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "open_queue",
+        "description": "Open the queue for requests",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!open"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "close_queue",
+        "description": "Close the queue",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!close"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "my_levels",
+        "description": "Show your levels in the queue",
+        "enabled": true,
+        "required_badges": [],
+        "trigger": "!mylevels"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "promote",
+        "description": "Move a level to the front",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!promote"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "shuffle",
+        "description": "Shuffle the queue order",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!shuffle"
+      },
+      {
+        "aliases": [],
+        "builtin_key": "replace",
+        "description": "Swap one of your levels for another, keeping your spot",
+        "enabled": true,
+        "required_badges": [],
+        "trigger": "!replace"
+      },
+      {
+        "aliases": [
+          "!bl"
+        ],
+        "builtin_key": "blacklist",
+        "description": "Block levels, creators, or requesters",
+        "enabled": true,
+        "required_badges": [
+          "moderator",
+          "broadcaster"
+        ],
+        "trigger": "!blacklist"
+      }
+    ],
     "description": "Manage a Geometry Dash level request queue from your chat.",
+    "download_url": "",
     "icon": "queue",
+    "id": "level-queue",
+    "min_app_version": "0.1.0",
+    "name": "Level Queue",
     "package_type": "module",
-    "verified": true,
     "premium": false,
+    "pub_date": "2026-07-27T10:10:17Z",
     "tags": [
       "official",
       "geometry-dash",
       "queue"
     ],
-    "commands": [
-      {
-        "trigger": "!r",
-        "aliases": [
-          "!request"
-        ],
-        "description": "Add a level to the queue",
-        "builtin_key": "request",
-        "required_badges": [],
-        "enabled": true
-      },
-      {
-        "trigger": "!next",
-        "aliases": [],
-        "description": "Pop the next level from the queue",
-        "builtin_key": "next",
-        "required_badges": [
-          "moderator",
-          "broadcaster"
-        ],
-        "enabled": true
-      },
-      {
-        "trigger": "!list",
-        "aliases": [],
-        "description": "Show the current queue",
-        "builtin_key": "list",
-        "required_badges": [],
-        "enabled": true
-      },
-      {
-        "trigger": "!pos",
-        "aliases": [
-          "!position"
-        ],
-        "description": "Get your position in the queue",
-        "builtin_key": "position",
-        "required_badges": [],
-        "enabled": true
-      },
-      {
-        "trigger": "!remove",
-        "aliases": [],
-        "description": "Remove a level from the queue",
-        "builtin_key": "remove",
-        "required_badges": [],
-        "enabled": true
-      },
-      {
-        "trigger": "!clear",
-        "aliases": [],
-        "description": "Clear the entire queue",
-        "builtin_key": "clear",
-        "required_badges": [
-          "moderator",
-          "broadcaster"
-        ],
-        "enabled": true
-      },
-      {
-        "trigger": "!open",
-        "aliases": [],
-        "description": "Open the queue for requests",
-        "builtin_key": "open_queue",
-        "required_badges": [
-          "moderator",
-          "broadcaster"
-        ],
-        "enabled": true
-      },
-      {
-        "trigger": "!close",
-        "aliases": [],
-        "description": "Close the queue",
-        "builtin_key": "close_queue",
-        "required_badges": [
-          "moderator",
-          "broadcaster"
-        ],
-        "enabled": true
-      },
-      {
-        "trigger": "!mylevels",
-        "aliases": [],
-        "description": "Show your levels in the queue",
-        "builtin_key": "my_levels",
-        "required_badges": [],
-        "enabled": true
-      },
-      {
-        "trigger": "!promote",
-        "aliases": [],
-        "description": "Move a level to the front",
-        "builtin_key": "promote",
-        "required_badges": [
-          "moderator",
-          "broadcaster"
-        ],
-        "enabled": true
-      },
-      {
-        "trigger": "!shuffle",
-        "aliases": [],
-        "description": "Shuffle the queue order",
-        "builtin_key": "shuffle",
-        "required_badges": [
-          "moderator",
-          "broadcaster"
-        ],
-        "enabled": true
-      }
-    ],
-    "libraries": [],
-    "modules": [],
-    "checksum": "ec0b94436bc18b3201e588ed9e9466ea73106bd96de1cae0860c6332d998c96e",
-    "pub_date": "2026-07-18T04:11:45Z",
-    "download_url": ""
+    "verified": true,
+    "version": "2.7.1"
   }
 ]
