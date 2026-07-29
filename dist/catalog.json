@@ -1,35 +1,7 @@
 [
   {
     "author": "GDLQBot Team",
-    "checksum": "9f31b3386b97c079445b7c681c5598ad8b300eeea4ec81be40c0ecf43b94b3ea",
-    "commands": [],
-    "description": "Standard utilities for RHAI Script Engine.",
-    "download_url": "",
-    "icon": "layers",
-    "id": "stdlib",
-    "libraries": [
-      "arr",
-      "str",
-      "math",
-      "fmt",
-      "io"
-    ],
-    "min_app_version": "0.1.0",
-    "modules": [],
-    "name": "Standard Library",
-    "package_type": "package",
-    "premium": false,
-    "pub_date": "2026-07-16T18:21:48Z",
-    "tags": [
-      "official",
-      "package"
-    ],
-    "verified": true,
-    "version": "1.0.0"
-  },
-  {
-    "author": "GDLQBot Team",
-    "checksum": "f2ea9d5aca0ba7ea7ce5a650a0f3f52940c8c5823d65734025ed8c687f93036c",
+    "checksum": "68f8972baafc1f4ee023a366b4953e42cdaa72e340981fe2af363a35b4e078f8",
     "commands": [
       {
         "aliases": [
@@ -171,13 +143,41 @@
     "name": "Level Queue",
     "package_type": "module",
     "premium": false,
-    "pub_date": "2026-07-27T10:10:17Z",
+    "pub_date": "2026-07-29T18:25:56Z",
     "tags": [
       "official",
       "geometry-dash",
       "queue"
     ],
     "verified": true,
-    "version": "2.7.1"
+    "version": "2.7.2"
+  },
+  {
+    "author": "GDLQBot Team",
+    "checksum": "9f31b3386b97c079445b7c681c5598ad8b300eeea4ec81be40c0ecf43b94b3ea",
+    "commands": [],
+    "description": "Standard utilities for RHAI Script Engine.",
+    "download_url": "",
+    "icon": "layers",
+    "id": "stdlib",
+    "libraries": [
+      "arr",
+      "str",
+      "math",
+      "fmt",
+      "io"
+    ],
+    "min_app_version": "0.1.0",
+    "modules": [],
+    "name": "Standard Library",
+    "package_type": "package",
+    "premium": false,
+    "pub_date": "2026-07-16T18:21:48Z",
+    "tags": [
+      "official",
+      "package"
+    ],
+    "verified": true,
+    "version": "1.0.0"
   }
 ]

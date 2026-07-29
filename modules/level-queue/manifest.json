@@ -1,7 +1,7 @@
 {
   "id": "level-queue",
   "name": "Level Queue",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "min_app_version": "0.1.0",
   "author": "GDLQBot Team",
   "description": "Manage a Geometry Dash level request queue from your chat.",
